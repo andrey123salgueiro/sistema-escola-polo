@@ -848,6 +848,7 @@ export default function App() {
                 teachers={onlyTeachers}
                 reports={reports}
                 classes={classes}
+                subjects={subjects}
                 onReleaseReports={handleReleaseReports}
                 onCancelRelease={handleCancelRelease}
                 onOpenReport={(rep) => setViewingReport(rep)}
@@ -886,6 +887,8 @@ export default function App() {
               <TeacherReportList
                 currentUser={currentUser}
                 reports={reports}
+                classes={classes}
+                subjects={subjects}
                 onEditReport={(rep) => {
                   setEditingReport(rep);
                   setActiveTab('new-form');

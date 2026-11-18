@@ -26,6 +26,7 @@ import {
   PlusCircle,
 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
+import { getTeacherSubjects } from '../utils/teacherUtils';
 
 interface TeacherManagementProps {
   teachers: User[];
@@ -42,6 +43,7 @@ interface ImportedTeacherPreview {
   existingId?: string;
   name: string;
   subject: string;
+  subjects: string[];
   classes: string[];
   email: string;
   password: string;
@@ -161,11 +163,15 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('123');
-  const [subject, setSubject] = useState(availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([
+    availableSubjectNames[0] || AVAILABLE_SUBJECTS[0],
+  ]);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([
     availableClassNames[0] || '6º Ano A',
   ]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterClass, setFilterClass] = useState('all');
+  const [filterSubject, setFilterSubject] = useState('all');
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [teacherToDelete, setTeacherToDelete] = useState<User | null>(null);
 
@@ -181,7 +187,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     setName('');
     setEmail('');
     setPassword('123');
-    setSubject(availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]);
+    setSelectedSubjects([availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]]);
     setSelectedClasses([availableClassNames[0] || '6º Ano A']);
     setEditingTeacherId(null);
     setShowQuickSubject(false);
@@ -199,14 +205,25 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   };
 
   const handleOpenEdit = (teacher: User) => {
+    const currentSubjects = getTeacherSubjects(teacher);
     setName(teacher.name);
     setEmail(teacher.email);
     setPassword(teacher.password || '123');
-    setSubject(teacher.subject || AVAILABLE_SUBJECTS[0]);
+    setSelectedSubjects(
+      currentSubjects.length > 0
+        ? currentSubjects
+        : [availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]]
+    );
     setSelectedClasses(teacher.classes || []);
     setEditingTeacherId(teacher.id);
     setShowForm(true);
     scrollToForm();
+  };
+
+  const handleToggleSubject = (sub: string) => {
+    setSelectedSubjects((prev) =>
+      prev.includes(sub) ? prev.filter((s) => s !== sub) : [...prev, sub]
+    );
   };
 
   const handleToggleClass = (cls: string) => {
@@ -223,9 +240,16 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
       return;
     }
 
+    if (selectedSubjects.length === 0) {
+      setFeedbackMsg('Por favor, selecione pelo menos uma matéria que o professor leciona.');
+      setTimeout(() => setFeedbackMsg(null), 4000);
+      return;
+    }
+
     const cleanName = name.trim();
     const cleanEmail = email.trim() || generateInstitutionEmail(cleanName);
     const cleanPass = password.trim() || '123';
+    const joinedSubject = selectedSubjects.join(', ');
 
     if (editingTeacherId) {
       const existing = teachers.find((t) => t.id === editingTeacherId);
@@ -236,7 +260,8 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           username: cleanName,
           email: cleanEmail,
           password: cleanPass,
-          subject,
+          subject: joinedSubject,
+          subjects: selectedSubjects,
           classes: selectedClasses,
         });
         setFeedbackMsg(`Dados do professor(a) "${cleanName}" atualizados com sucesso!`);
@@ -249,7 +274,8 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         email: cleanEmail,
         password: cleanPass,
         role: 'professor',
-        subject,
+        subject: joinedSubject,
+        subjects: selectedSubjects,
         classes: selectedClasses,
         createdAt: new Date().toISOString().split('T')[0],
       };
@@ -432,15 +458,21 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
               ? Array.from(new Set([...(existingTeacher.classes || []), ...entry.classes]))
               : entry.classes;
 
-            const mergedSubject =
+            const existingSubjects = existingTeacher
+              ? getTeacherSubjects(existingTeacher)
+              : [];
+            const mergedSubjects =
               entry.subjects.length > 0
-                ? entry.subjects.join(', ')
-                : existingTeacher?.subject || availableSubjectNames[0] || AVAILABLE_SUBJECTS[0];
+                ? Array.from(new Set([...existingSubjects, ...entry.subjects]))
+                : existingSubjects.length > 0
+                ? existingSubjects
+                : [availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]];
 
             return {
               existingId: existingTeacher?.id,
               name: existingTeacher?.name || entry.name,
-              subject: mergedSubject,
+              subject: mergedSubjects.join(', '),
+              subjects: mergedSubjects,
               classes: mergedClasses,
               email:
                 entry.email ||
@@ -480,6 +512,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           email: item.email,
           password: item.password,
           subject: item.subject,
+          subjects: item.subjects,
           classes: item.classes,
         };
       }
@@ -491,6 +524,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         password: item.password,
         role: 'professor',
         subject: item.subject,
+        subjects: item.subjects,
         classes: item.classes,
         createdAt: todayStr,
       };
@@ -529,8 +563,8 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     const templateData = [
       {
         'Nome do Professor': 'Carlos Eduardo Souza',
-        'Matéria': 'Matemática',
-        'Turmas': '6º Ano A, 7º Ano B, 8º Ano A',
+        'Matéria': 'Matemática, Física',
+        'Turmas': '6º Ano A, 7º Ano B, 1º Ano EM',
         'E-mail': 'carlos.souza@escola.gov.br',
         'Senha': '123',
       },
@@ -550,8 +584,8 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
       },
       {
         'Nome do Professor': 'Roberto Silva Lima',
-        'Matéria': 'Ciências da Natureza',
-        'Turmas': '7º Ano A',
+        'Matéria': 'Biologia',
+        'Turmas': '1º Ano EM',
         'E-mail': '',
         'Senha': '',
       },
@@ -567,7 +601,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   const handleExportTeachers = () => {
     const listToExport = filteredTeachers.map((t) => ({
       'Nome do Professor': t.name,
-      'Matéria': t.subject || '',
+      'Matéria': getTeacherSubjects(t).join(', '),
       'Turmas': (t.classes || []).join(', '),
       'E-mail': t.email,
       'Senha': t.password || '123',
@@ -583,19 +617,31 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   };
 
   const filteredTeachers = teachers.filter((t) => {
+    const teacherSubjects = getTeacherSubjects(t);
+    if (filterClass !== 'all' && !(t.classes || []).includes(filterClass)) {
+      return false;
+    }
+    if (
+      filterSubject !== 'all' &&
+      !teacherSubjects.some((s) => normalizeText(s) === normalizeText(filterSubject))
+    ) {
+      return false;
+    }
+
     const q = searchTerm.toLowerCase();
+    if (!q.trim()) return true;
     return (
       t.name.toLowerCase().includes(q) ||
       t.email.toLowerCase().includes(q) ||
-      (t.subject && t.subject.toLowerCase().includes(q)) ||
+      teacherSubjects.some((s) => s.toLowerCase().includes(q)) ||
       (t.classes && t.classes.some((c) => c.toLowerCase().includes(q)))
     );
   });
 
-  // Ensure subject select always shows current custom subject if imported
-  const subjectOptions = availableSubjectNames.includes(subject)
-    ? availableSubjectNames
-    : [subject, ...availableSubjectNames];
+  // Ensure subject checkboxes include any extra assigned/imported subjects
+  const allSubjectOptions = Array.from(
+    new Set([...availableSubjectNames, ...selectedSubjects])
+  );
 
   const handleQuickAddSubject = () => {
     const clean = quickSubjectName.trim();
@@ -604,7 +650,9 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
       (s) => normalizeText(s) === normalizeText(clean)
     );
     if (exists) {
-      setSubject(exists);
+      setSelectedSubjects((prev) =>
+        prev.includes(exists) ? prev : [...prev, exists]
+      );
       setQuickSubjectName('');
       setShowQuickSubject(false);
       return;
@@ -614,7 +662,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
       name: clean,
       createdAt: new Date().toISOString().split('T')[0],
     });
-    setSubject(clean);
+    setSelectedSubjects((prev) => (prev.includes(clean) ? prev : [...prev, clean]));
     setQuickSubjectName('');
     setShowQuickSubject(false);
   };
@@ -759,11 +807,15 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
               </div>
             </div>
 
-            {/* Disciplina */}
+            {/* Disciplinas (Múltipla Seleção) */}
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-stone-700">
-                  Componente Curricular / Matéria Principal
+                  Matérias / Componentes Curriculares Lecionados *{' '}
+                  <span className="text-[11px] font-normal text-stone-500">
+                    ({selectedSubjects.length}{' '}
+                    {selectedSubjects.length === 1 ? 'selecionada' : 'selecionadas'})
+                  </span>
                 </label>
                 {onAddSubject && (
                   <button
@@ -802,23 +854,42 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                 </div>
               )}
 
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500"
-              >
-                {subjectOptions.map((sub) => (
-                  <option key={sub} value={sub}>
-                    {sub}
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 bg-stone-50 p-3 rounded-xl border border-stone-200">
+                {allSubjectOptions.map((sub) => {
+                  const isChecked = selectedSubjects.includes(sub);
+                  return (
+                    <label
+                      key={sub}
+                      className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer border transition-colors ${
+                        isChecked
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold'
+                          : 'bg-white border-stone-200 text-stone-600 hover:border-stone-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleSubject(sub)}
+                        className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                      />
+                      <span className="truncate">{sub}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-stone-500 mt-1">
+                Você pode marcar uma ou mais matérias se o professor lecionar múltiplas disciplinas.
+              </p>
             </div>
 
             {/* Turmas */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                Turmas em que o docente leciona:
+                Turmas em que o docente leciona:{' '}
+                <span className="text-[11px] font-normal text-stone-500">
+                  ({selectedClasses.length}{' '}
+                  {selectedClasses.length === 1 ? 'selecionada' : 'selecionadas'})
+                </span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 bg-stone-50 p-3 rounded-xl border border-stone-200">
                 {allClassOptions.map((cls) => {
@@ -925,10 +996,10 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
               <div className="bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-[11px] text-stone-600 space-y-1">
                 <p className="font-bold text-stone-800">Como sua planilha pode estar organizada:</p>
                 <p>
-                  • <strong>Várias turmas na mesma linha:</strong> separadas por vírgula ou ponto e vírgula (ex: <code className="bg-white px-1 py-0.5 rounded border border-stone-200">6º Ano A, 7º Ano B, 1º Ano EM</code>).
+                  • <strong>Várias turmas ou várias matérias na mesma linha:</strong> separe por vírgula ou ponto e vírgula (ex: <code className="bg-white px-1 py-0.5 rounded border border-stone-200">Matemática, Física</code> e <code className="bg-white px-1 py-0.5 rounded border border-stone-200">6º Ano A, 7º Ano B</code>).
                 </p>
                 <p>
-                  • <strong>Uma turma por linha:</strong> se o mesmo professor aparecer em várias linhas, o sistema agrupa todas as turmas dele automaticamente.
+                  • <strong>Uma turma/matéria por linha:</strong> se o mesmo professor aparecer em várias linhas, o sistema agrupa todas as turmas e matérias dele automaticamente.
                 </p>
                 <p>
                   • Senha padrão quando não informada na planilha: <code className="bg-white px-1 py-0.5 rounded border border-stone-200 font-bold">123</code>.
@@ -1026,20 +1097,50 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
       {/* Teachers List */}
       <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
-        {/* Search header */}
-        <div className="p-4 border-b border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-50/50">
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar professor por nome, matéria ou turma..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-amber-500"
-            />
+        {/* Search & Filter header */}
+        <div className="p-4 border-b border-stone-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-stone-50/50">
+          <div className="flex flex-wrap items-center gap-2 flex-1">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar professor por nome, matéria ou turma..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <select
+              value={filterClass}
+              onChange={(e) => setFilterClass(e.target.value)}
+              className="bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs text-stone-800 focus:ring-2 focus:ring-amber-500 font-medium"
+              aria-label="Filtrar professores por turma"
+            >
+              <option value="all">Todas as Turmas</option>
+              {availableClassNames.map((cls) => (
+                <option key={cls} value={cls}>
+                  {cls}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterSubject}
+              onChange={(e) => setFilterSubject(e.target.value)}
+              className="bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs text-stone-800 focus:ring-2 focus:ring-amber-500 font-medium"
+              aria-label="Filtrar professores por matéria"
+            >
+              <option value="all">Todas as Matérias</option>
+              {availableSubjectNames.map((sub) => (
+                <option key={sub} value={sub}>
+                  {sub}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="flex items-center gap-3 self-end lg:self-auto">
             <span className="text-xs text-stone-500">
               Total: <strong>{filteredTeachers.length}</strong> professores ativos
             </span>
@@ -1057,7 +1158,9 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
         {/* Teachers Table */}
         <div className="divide-y divide-stone-100">
-          {filteredTeachers.map((teacher) => (
+          {filteredTeachers.map((teacher) => {
+            const teacherSubjects = getTeacherSubjects(teacher);
+            return (
             <div
               key={teacher.id}
               className="p-4 hover:bg-stone-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -1069,10 +1172,21 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                 <div>
                   <h4 className="text-sm font-bold text-stone-900">{teacher.name}</h4>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500 mt-0.5">
-                    <span className="flex items-center gap-1 text-stone-700 font-medium">
-                      <BookOpen className="w-3.5 h-3.5 text-stone-400" />
-                      {teacher.subject || 'Geral'}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      {teacherSubjects.length > 0 ? (
+                        teacherSubjects.map((sub) => (
+                          <span
+                            key={sub}
+                            className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[11px] font-semibold"
+                          >
+                            {sub}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-stone-600 font-medium">Geral</span>
+                      )}
+                    </div>
                     <span className="flex items-center gap-1 text-stone-500">
                       <Mail className="w-3.5 h-3.5 text-stone-400" />
                       {teacher.email}
@@ -1123,7 +1237,8 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

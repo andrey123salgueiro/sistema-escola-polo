@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { PreCouncilReport, User, SchoolClass } from '../types';
+import React, { useState, useEffect } from 'react';
+import { PreCouncilReport, User, SchoolClass, SchoolSubject } from '../types';
 import {
   Send,
   CheckCircle,
@@ -23,11 +23,13 @@ import {
   AVAILABLE_CLASSES,
 } from '../data/initialData';
 import { ConfirmDialog } from './ConfirmDialog';
+import { getTeacherClasses, getTeacherSubjects } from '../utils/teacherUtils';
 
 interface ReleaseReportManagementProps {
   teachers: User[];
   reports: PreCouncilReport[];
   classes?: SchoolClass[];
+  subjects?: SchoolSubject[];
   onReleaseReports: (newReports: PreCouncilReport[]) => void;
   onCancelRelease: (reportId: string) => void;
   onOpenReport: (report: PreCouncilReport) => void;
@@ -49,8 +51,10 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
     teachers[0]?.id || ''
   );
   const [selectedClass, setSelectedClass] = useState(
-    availableClassNames[0] || '6º Ano A'
+    getTeacherClasses(teachers[0])[0] || availableClassNames[0] || '6º Ano A'
   );
+  const [selectedSubject, setSelectedSubject] = useState<string>('__auto__');
+  const [showAllClassesForTeacher, setShowAllClassesForTeacher] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [reportToCancel, setReportToCancel] = useState<PreCouncilReport | null>(null);
@@ -58,6 +62,40 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
     text: string;
     type: 'success' | 'info' | 'warning';
   } | null>(null);
+
+  const selectedTeacherObj = teachers.find((t) => t.id === selectedTeacherId);
+  const selectedTeacherClasses = getTeacherClasses(selectedTeacherObj);
+  const selectedTeacherSubjects = getTeacherSubjects(selectedTeacherObj);
+  const filteredSpecificClasses =
+    !showAllClassesForTeacher && selectedTeacherClasses.length > 0
+      ? selectedTeacherClasses
+      : availableClassNames;
+
+  useEffect(() => {
+    if (!selectedTeacherId && teachers[0]?.id) {
+      setSelectedTeacherId(teachers[0].id);
+    }
+  }, [teachers, selectedTeacherId]);
+
+  useEffect(() => {
+    const teacher = teachers.find((t) => t.id === selectedTeacherId);
+    const tClasses = getTeacherClasses(teacher);
+    const tSubjects = getTeacherSubjects(teacher);
+
+    if (tClasses.length > 0 && !showAllClassesForTeacher) {
+      if (!tClasses.includes(selectedClass)) {
+        setSelectedClass(tClasses[0]);
+      }
+    } else if (!availableClassNames.includes(selectedClass) && availableClassNames[0]) {
+      setSelectedClass(availableClassNames[0]);
+    }
+
+    if (tSubjects.length === 1) {
+      setSelectedSubject(tSubjects[0]);
+    } else {
+      setSelectedSubject('__auto__');
+    }
+  }, [selectedTeacherId, showAllClassesForTeacher]);
 
   const showFeedback = (
     text: string,
@@ -77,10 +115,20 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
     if (releaseMode === 'all') {
       // Release for all teachers based on their assigned classes & subjects
       teachers.forEach((teacher) => {
-        const classes = teacher.classes && teacher.classes.length > 0 ? teacher.classes : ['6º Ano A'];
-        const component = teacher.subject || 'Componente Curricular';
+        const assignedClasses = getTeacherClasses(teacher);
+        const targetClasses =
+          assignedClasses.length > 0
+            ? assignedClasses
+            : [availableClassNames[0] || '6º Ano A'];
+        const tSubjects = getTeacherSubjects(teacher);
+        const component =
+          tSubjects.length === 1
+            ? tSubjects[0]
+            : tSubjects.length > 1
+            ? 'A definir pelo professor'
+            : 'Componente Curricular';
 
-        classes.forEach((cls) => {
+        targetClasses.forEach((cls) => {
           // Check if already released for this teacher, class and bimester
           const alreadyExists = reports.some(
             (r) =>
@@ -137,16 +185,33 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
         return;
       }
 
-      const alreadyExists = reports.some(
-        (r) =>
-          r.teacherId === teacher.id &&
-          r.classGroup === selectedClass &&
-          r.bimester === bimester
-      );
+      const tSubjects = getTeacherSubjects(teacher);
+      const targetComponent =
+        selectedSubject !== '__auto__'
+          ? selectedSubject
+          : tSubjects.length === 1
+          ? tSubjects[0]
+          : tSubjects.length > 1
+          ? 'A definir pelo professor'
+          : 'Componente Curricular';
+
+      const alreadyExists = reports.some((r) => {
+        if (
+          r.teacherId !== teacher.id ||
+          r.classGroup !== selectedClass ||
+          r.bimester !== bimester
+        ) {
+          return false;
+        }
+        if (targetComponent === 'A definir pelo professor') {
+          return true;
+        }
+        return r.component === targetComponent;
+      });
 
       if (alreadyExists) {
         showFeedback(
-          `A ficha de ${teacher.name} para a turma "${selectedClass}" no ${bimester} já existe! Não é possível gerar fichas duplicadas.`,
+          `A ficha de ${teacher.name} (${targetComponent}) para a turma "${selectedClass}" no ${bimester} já existe! Não é possível gerar fichas duplicadas.`,
           'warning'
         );
         return;
@@ -159,7 +224,7 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
         title: REPORT_TITLE,
         teacherId: teacher.id,
         teacherName: teacher.name,
-        component: teacher.subject || 'Componente Curricular',
+        component: targetComponent,
         classGroup: selectedClass,
         date: todayStr,
         bimester,
@@ -173,7 +238,7 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
 
       onReleaseReports([newReport]);
       showFeedback(
-        `Ficha disponibilizada para ${teacher.name} na turma "${selectedClass}" (${bimester})!`,
+        `Ficha disponibilizada para ${teacher.name} na turma "${selectedClass}" (${targetComponent} • ${bimester})!`,
         'success'
       );
     }
@@ -314,7 +379,7 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
 
             {/* Specific inputs if specific mode is selected */}
             {releaseMode === 'specific' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-stone-50 rounded-xl border border-stone-200 animate-fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-stone-50 rounded-xl border border-stone-200 animate-fade-in">
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
                     Selecionar Professor
@@ -324,9 +389,42 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
                     onChange={(e) => setSelectedTeacherId(e.target.value)}
                     className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500"
                   >
-                    {teachers.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.subject || 'Docente'})
+                    {teachers.map((t) => {
+                      const tSubs = getTeacherSubjects(t);
+                      return (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({tSubs.join(', ') || 'Docente'})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-stone-700">
+                      Turma do Professor ({filteredSpecificClasses.length})
+                    </label>
+                    {selectedTeacherClasses.length > 0 && (
+                      <label className="flex items-center gap-1 text-[10px] text-stone-500 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showAllClassesForTeacher}
+                          onChange={(e) => setShowAllClassesForTeacher(e.target.checked)}
+                          className="rounded text-amber-600"
+                        />
+                        <span>Todas</span>
+                      </label>
+                    )}
+                  </div>
+                  <select
+                    value={selectedClass}
+                    onChange={(e) => setSelectedClass(e.target.value)}
+                    className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500"
+                  >
+                    {filteredSpecificClasses.map((cls) => (
+                      <option key={cls} value={cls}>
+                        {cls}
                       </option>
                     ))}
                   </select>
@@ -334,19 +432,31 @@ export const ReleaseReportManagement: React.FC<ReleaseReportManagementProps> = (
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Selecionar Turma
+                    Matéria da Ficha
                   </label>
-                  <select
-                    value={selectedClass}
-                    onChange={(e) => setSelectedClass(e.target.value)}
-                    className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500"
-                  >
-                    {availableClassNames.map((cls) => (
-                      <option key={cls} value={cls}>
-                        {cls}
+                  {selectedTeacherSubjects.length <= 1 ? (
+                    <input
+                      type="text"
+                      readOnly
+                      value={selectedTeacherSubjects[0] || 'Componente Curricular'}
+                      className="w-full bg-stone-100 border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-700 font-semibold cursor-not-allowed"
+                    />
+                  ) : (
+                    <select
+                      value={selectedSubject}
+                      onChange={(e) => setSelectedSubject(e.target.value)}
+                      className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="__auto__">
+                        Professor seleciona na ficha ({selectedTeacherSubjects.length} matérias)
                       </option>
-                    ))}
-                  </select>
+                      {selectedTeacherSubjects.map((sub) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
             )}

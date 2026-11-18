@@ -24,6 +24,7 @@ import {
   Users,
 } from 'lucide-react';
 import { triggerPrint } from '../utils/print';
+import { getTeacherClasses } from '../utils/teacherUtils';
 
 interface ClassPanoramaProps {
   classes: SchoolClass[];
@@ -46,25 +47,35 @@ export const ClassPanorama: React.FC<ClassPanoramaProps> = ({
 }) => {
   const isTeacher = currentUser?.role === 'professor';
 
+  // Filter classes to only those assigned to the professor when logged in as teacher
+  const visibleClasses = useMemo(() => {
+    if (!isTeacher) return classes;
+    const assigned = getTeacherClasses(currentUser);
+    if (assigned.length === 0) return [];
+    const byName = new Map<string, SchoolClass>(classes.map((c) => [c.name, c]));
+    return assigned.map((clsName) => byName.get(clsName) || { id: clsName, name: clsName });
+  }, [classes, isTeacher, currentUser]);
+
   // Determine initial class safely
   const initialClass = useMemo(() => {
-    if (isTeacher && currentUser?.classes && currentUser.classes.length > 0) {
-      const match = classes.find((c) => currentUser.classes?.includes(c.name));
-      if (match) return match.name;
-    }
-    return classes[0]?.name || '6º Ano A';
-  }, [classes, isTeacher, currentUser]);
+    return visibleClasses[0]?.name || '';
+  }, [visibleClasses]);
 
   const [selectedClass, setSelectedClass] = useState<string>(initialClass);
   const [selectedBimester, setSelectedBimester] = useState<string>('Todos');
   const [printBlockedNotice, setPrintBlockedNotice] = useState<boolean>(false);
 
-  // Keep selectedClass synchronized if classes list changes or loads
+  // Keep selectedClass synchronized if visibleClasses changes or loads
   useEffect(() => {
-    if (classes.length > 0 && (!selectedClass || !classes.some((c) => c.name === selectedClass))) {
-      setSelectedClass(initialClass);
+    if (
+      visibleClasses.length > 0 &&
+      (!selectedClass || !visibleClasses.some((c) => c.name === selectedClass))
+    ) {
+      setSelectedClass(visibleClasses[0].name);
+    } else if (visibleClasses.length === 0 && selectedClass) {
+      setSelectedClass('');
     }
-  }, [classes, initialClass, selectedClass]);
+  }, [visibleClasses, selectedClass]);
 
   // Filter completed/submitted reports for this class and bimester
   const classReports = useMemo(() => {
@@ -171,13 +182,18 @@ export const ClassPanorama: React.FC<ClassPanoramaProps> = ({
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
+              disabled={visibleClasses.length === 0}
               className="bg-stone-50 border border-stone-300 rounded-xl px-3 py-1.5 text-xs text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 font-bold"
             >
-              {classes.map((cls) => (
-                <option key={cls.id} value={cls.name}>
-                  {cls.name}
-                </option>
-              ))}
+              {visibleClasses.length === 0 ? (
+                <option value="">Sem turmas atribuídas</option>
+              ) : (
+                visibleClasses.map((cls) => (
+                  <option key={cls.id} value={cls.name}>
+                    {cls.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

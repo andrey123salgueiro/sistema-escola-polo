@@ -22,6 +22,7 @@ import {
   PieChart,
 } from 'lucide-react';
 import { triggerPrint } from '../utils/print';
+import { getTeacherClasses } from '../utils/teacherUtils';
 
 interface ClassPerformanceProps {
   classes: SchoolClass[];
@@ -39,9 +40,16 @@ export const ClassPerformance: React.FC<ClassPerformanceProps> = ({
   currentUser,
 }) => {
   const isDiretora = currentUser.role === 'diretora';
-  const defaultClass = isDiretora
-    ? 'all'
-    : currentUser.classes?.[0] || 'all';
+  const teacherClasses = getTeacherClasses(currentUser);
+
+  const visibleClasses = isDiretora
+    ? classes
+    : teacherClasses.map(
+        (clsName) =>
+          classes.find((c) => c.name === clsName) || { id: clsName, name: clsName }
+      );
+
+  const defaultClass = isDiretora ? 'all' : teacherClasses[0] || 'all';
 
   const [selectedClass, setSelectedClass] = useState<string>(defaultClass);
   const [selectedBimester, setSelectedBimester] = useState<string>('all');
@@ -50,13 +58,13 @@ export const ClassPerformance: React.FC<ClassPerformanceProps> = ({
   // Filter archived reports (enviado or visto)
   const activeReports = reports.filter((r) => {
     if (r.status !== 'enviado' && r.status !== 'visto') return false;
-    if (selectedClass !== 'all' && r.classGroup !== selectedClass) return false;
-    if (selectedBimester !== 'all' && r.bimester !== selectedBimester) return false;
-    if (!isDiretora && currentUser.classes && currentUser.classes.length > 0) {
-      if (selectedClass === 'all' && !currentUser.classes.includes(r.classGroup)) {
+    if (!isDiretora) {
+      if (teacherClasses.length === 0 || !teacherClasses.includes(r.classGroup)) {
         return false;
       }
     }
+    if (selectedClass !== 'all' && r.classGroup !== selectedClass) return false;
+    if (selectedBimester !== 'all' && r.bimester !== selectedBimester) return false;
     return true;
   });
 
@@ -169,8 +177,10 @@ export const ClassPerformance: React.FC<ClassPerformanceProps> = ({
               onChange={(e) => setSelectedClass(e.target.value)}
               className="bg-stone-50 border border-stone-300 rounded-xl px-3 py-1.5 text-xs text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 font-bold"
             >
-              <option value="all">Todas as Turmas</option>
-              {classes.map((cls) => (
+              <option value="all">
+                {isDiretora ? 'Todas as Turmas' : 'Todas as Minhas Turmas'}
+              </option>
+              {visibleClasses.map((cls) => (
                 <option key={cls.id} value={cls.name}>
                   {cls.name}
                 </option>

@@ -18,6 +18,11 @@ import {
   EVALUATION_DIMENSIONS,
 } from '../data/initialData';
 import {
+  getTeacherClasses,
+  getTeacherSubjects,
+  isUnassignedReportComponent,
+} from '../utils/teacherUtils';
+import {
   Save,
   Send,
   CheckCircle2,
@@ -63,12 +68,33 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   onPreview,
 }) => {
   const activeReport = existingReport || editingReport;
+  const allSchoolSubjectNames =
+    subjects.length > 0 ? subjects.map((s) => s.name) : AVAILABLE_SUBJECTS;
+  const teacherSubjects = getTeacherSubjects(currentUser);
+  const teacherClasses = getTeacherClasses(currentUser);
+
+  const resolveInitialComponent = (reportComp?: string): string => {
+    if (
+      reportComp &&
+      !isUnassignedReportComponent(reportComp, allSchoolSubjectNames)
+    ) {
+      return reportComp;
+    }
+    if (currentUser.role === 'professor') {
+      if (teacherSubjects.length === 1) return teacherSubjects[0];
+      if (teacherSubjects.length > 1) return '';
+    }
+    return teacherSubjects[0] || allSchoolSubjectNames[0] || 'Matemática';
+  };
+
   // Form fields
-  const [component, setComponent] = useState(
-    activeReport?.component || currentUser.subject || 'Matemática'
+  const [component, setComponent] = useState<string>(() =>
+    resolveInitialComponent(activeReport?.component)
   );
   const [classGroup, setClassGroup] = useState(
-    activeReport?.classGroup || currentUser.classes?.[0] || '6º Ano A'
+    activeReport?.classGroup ||
+      teacherClasses[0] ||
+      (classes.length > 0 ? classes[0].name : AVAILABLE_CLASSES[0])
   );
   const [date, setDate] = useState(
     activeReport?.date || new Date().toISOString().split('T')[0]
@@ -91,7 +117,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
   useEffect(() => {
     if (activeReport) {
-      setComponent(activeReport.component);
+      setComponent(resolveInitialComponent(activeReport.component));
       setClassGroup(activeReport.classGroup);
       setDate(activeReport.date || new Date().toISOString().split('T')[0]);
       setBimester(activeReport.bimester);
@@ -147,7 +173,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       title: REPORT_TITLE,
       teacherId: currentUser.id,
       teacherName: currentUser.name,
-      component,
+      component: component || 'A definir pelo professor',
       classGroup,
       date,
       bimester,
@@ -169,6 +195,13 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const handleSubmitFinal = (e: React.FormEvent) => {
     e.preventDefault();
     const errors: string[] = [];
+
+    if (
+      !component.trim() ||
+      isUnassignedReportComponent(component, allSchoolSubjectNames)
+    ) {
+      errors.push('Selecione a matéria / componente curricular desta turma antes de enviar.');
+    }
 
     // Verify required questions
     questions.forEach((q) => {
@@ -306,7 +339,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         {activeReport && (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-semibold">
             <Lock className="w-3.5 h-3.5 text-amber-700" />
-            <span>Ficha autorizada pela Direção: {classGroup} • {bimester} • {component}</span>
+            <span>
+              Ficha autorizada pela Direção: {classGroup} • {bimester} •{' '}
+              {component || 'Selecione a matéria'}
+            </span>
           </div>
         )}
       </div>
@@ -383,19 +419,30 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             <div>
               <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-stone-500" />
-                Componente:
+                <span>Matéria / Componente *:</span>
               </label>
               <select
                 value={component}
                 onChange={(e) => setComponent(e.target.value)}
-                className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                required
+                className={`w-full bg-white border rounded-lg px-3 py-2 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-semibold ${
+                  !component
+                    ? 'border-amber-500 ring-2 ring-amber-200 bg-amber-50/40'
+                    : 'border-stone-300'
+                }`}
               >
+                {(teacherSubjects.length > 1 || !component) && (
+                  <option value="">-- Selecione a matéria da turma --</option>
+                )}
                 {Array.from(
                   new Set([
-                    ...(subjects.length > 0
-                      ? subjects.map((s) => s.name)
-                      : AVAILABLE_SUBJECTS),
-                    ...(component ? [component] : []),
+                    ...(currentUser.role === 'professor' && teacherSubjects.length > 0
+                      ? teacherSubjects
+                      : allSchoolSubjectNames),
+                    ...(component &&
+                    !isUnassignedReportComponent(component, allSchoolSubjectNames)
+                      ? [component]
+                      : []),
                   ])
                 ).map((sub) => (
                   <option key={sub} value={sub}>
@@ -423,20 +470,39 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             <div>
               <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-stone-500" />
-                Turma Definida:
+                {activeReport ? 'Turma Definida:' : 'Turma:'}
               </label>
-              <div className="relative">
-                <input
-                  type="text"
+              {activeReport ? (
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={classGroup}
+                    readOnly
+                    title="Turma autorizada e fixada pela Direção Escolar"
+                    className="w-full bg-stone-100 border border-stone-300 rounded-lg px-3 py-2 pr-14 text-xs text-stone-800 font-bold cursor-not-allowed select-none"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-200/90 px-1.5 py-0.5 rounded">
+                    <Lock className="w-2.5 h-2.5" /> Fixo
+                  </span>
+                </div>
+              ) : (
+                <select
                   value={classGroup}
-                  readOnly
-                  title="Turma autorizada e fixada pela Direção Escolar"
-                  className="w-full bg-stone-100 border border-stone-300 rounded-lg px-3 py-2 pr-14 text-xs text-stone-800 font-bold cursor-not-allowed select-none"
-                />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-200/90 px-1.5 py-0.5 rounded">
-                  <Lock className="w-2.5 h-2.5" /> Fixo
-                </span>
-              </div>
+                  onChange={(e) => setClassGroup(e.target.value)}
+                  className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 font-semibold focus:ring-2 focus:ring-amber-500"
+                >
+                  {(currentUser.role === 'professor' && teacherClasses.length > 0
+                    ? teacherClasses
+                    : classes.length > 0
+                    ? classes.map((c) => c.name)
+                    : AVAILABLE_CLASSES
+                  ).map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Data & Trimestre */}

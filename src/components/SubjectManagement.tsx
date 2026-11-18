@@ -12,6 +12,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
+import { getTeacherSubjects } from '../utils/teacherUtils';
 
 interface SubjectManagementProps {
   subjects: SchoolSubject[];
@@ -120,12 +121,9 @@ export const SubjectManagement: React.FC<SubjectManagementProps> = ({
 
   const getTeacherCountForSubject = (subjectName: string) => {
     const normTarget = normalizeText(subjectName);
-    return teachers.filter((t) => {
-      if (!t.subject) return false;
-      return t.subject
-        .split(/[,;]+/)
-        .some((part) => normalizeText(part) === normTarget);
-    }).length;
+    return teachers.filter((t) =>
+      getTeacherSubjects(t).some((part) => normalizeText(part) === normTarget)
+    ).length;
   };
 
   const filteredSubjects = subjects.filter((s) => {

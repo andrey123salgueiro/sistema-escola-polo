@@ -8,7 +8,8 @@ export interface User {
   username?: string;
   password?: string;
   role: UserRole;
-  subject?: string; // Componente curricular principal
+  subject?: string; // Componente curricular principal ou lista separada por vírgula
+  subjects?: string[]; // Múltiplos componentes curriculares lecionados
   classes?: string[]; // Turmas atribuídas
   createdAt: string;
 }

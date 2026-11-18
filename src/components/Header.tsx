@@ -354,7 +354,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <p className="font-semibold text-slate-900 truncate max-w-[140px]">
                     {currentUser.name}
                   </p>
-                  <p className="text-[11px] text-slate-500 font-medium">
+                  <p className="text-[11px] text-slate-500 font-medium truncate max-w-[160px]" title={isDiretora ? 'Diretoria Escolar' : currentUser.subject || 'Docente'}>
                     {isDiretora ? 'Diretoria Escolar' : currentUser.subject || 'Docente'}
                   </p>
                 </div>
