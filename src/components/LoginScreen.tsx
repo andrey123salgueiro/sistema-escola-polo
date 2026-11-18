@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User } from '../types';
 import { Logo } from './Logo';
 import {
@@ -51,31 +51,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [teacherPassword, setTeacherPassword] = useState('');
   const [showTeacherPassword, setShowTeacherPassword] = useState(false);
 
-  // Fields for Director Login
-  const [diretoraInput, setDiretoraInput] = useState('admin');
-  const [hasEditedDiretoraInput, setHasEditedDiretoraInput] = useState(false);
+  // Fields for Administrative Team Login
+  const [diretoraInput, setDiretoraInput] = useState('');
   const [diretoraPassword, setDiretoraPassword] = useState('');
   const [showDiretoraPassword, setShowDiretoraPassword] = useState(false);
 
   // Error feedback
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const diretoraUser = users.find((u) => u.role === 'diretora');
+  const adminUsers = users.filter((u) => u.role === 'diretora');
   const teacherUsers = users.filter((u) => u.role === 'professor');
-
-  const usesDefaultAdminCreds =
-    (diretoraUser?.username || 'admin').toLowerCase() === 'admin' &&
-    (diretoraUser?.password || '123') === '123';
-
-  useEffect(() => {
-    if (
-      !hasEditedDiretoraInput &&
-      diretoraUser?.username &&
-      diretoraUser.username.trim().toLowerCase() !== 'admin'
-    ) {
-      setDiretoraInput('');
-    }
-  }, [diretoraUser?.username, hasEditedDiretoraInput]);
 
   // Handle Teacher Submit
   const handleTeacherSubmit = (e: React.FormEvent) => {
@@ -97,15 +82,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     const normInput = normalize(rawInput);
 
-    const adminUsername = normalize(diretoraUser?.username || 'admin');
-    const adminEmail = normalize(diretoraUser?.email || 'diretoria@escola.gov.br');
-    if (
-      normInput === adminUsername ||
-      normInput === adminEmail ||
-      normInput === 'diretoria@escola.gov.br'
-    ) {
+    const isAdminUser = adminUsers.some((admin) => {
+      const adminUsername = normalize(admin.username || '');
+      const adminEmail = normalize(admin.email || '');
+      return (
+        (adminUsername !== '' && normInput === adminUsername) ||
+        (adminEmail !== '' && normInput === adminEmail) ||
+        normInput === 'diretoria@escola.gov.br'
+      );
+    });
+    if (isAdminUser) {
       setErrorMessage(
-        'Este usuário pertence à Direção. Por favor, acesse através da aba Acesso da Diretoria.'
+        'Este usuário pertence à Equipe Administrativa. Por favor, acesse através da aba Acesso Administrativo.'
       );
       return;
     }
@@ -151,62 +139,81 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     onLoginSuccess(foundTeacher);
   };
 
-  // Handle Director Submit
+  // Handle Administrative Team Submit
   const handleDiretoraSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const cleanInput = diretoraInput.trim().toLowerCase();
+    const rawInput = diretoraInput.trim();
+    const normInput = normalize(rawInput);
     const cleanPass = diretoraPassword.trim();
 
-    if (!cleanInput) {
-      setErrorMessage('Por favor, informe o usuário ou e-mail da Diretoria.');
+    if (!rawInput) {
+      setErrorMessage('Por favor, informe o seu usuário ou e-mail administrativo.');
       return;
     }
 
     if (!cleanPass) {
-      setErrorMessage('Por favor, digite a senha da Diretoria.');
+      setErrorMessage('Por favor, digite a sua senha de acesso.');
       return;
     }
 
-    const isTeacher = teacherUsers.some(
-      (t) =>
-        normalize(t.name) === normalize(cleanInput) ||
-        normalize(t.username || '') === normalize(cleanInput)
-    );
+    // 1. Exact match by username, email or full name across all administrative users
+    let matchedAdmin = adminUsers.find((admin) => {
+      const normUsername = normalize(admin.username || '');
+      const normEmail = normalize(admin.email || '');
+      const normName = normalize(admin.name || '');
+      return (
+        (normUsername !== '' && normInput === normUsername) ||
+        (normEmail !== '' && normInput === normEmail) ||
+        (normName !== '' && normInput === normName)
+      );
+    });
 
-    if (isTeacher) {
+    // 2. Fallback: unique partial name match (e.g. "Ana Paula Machado" matching "Prof.ª Ana Paula Machado (Direção)")
+    if (!matchedAdmin && normInput.length >= 3) {
+      const candidates = adminUsers.filter((admin) => {
+        const normName = normalize(admin.name || '');
+        return normName.includes(normInput) || normInput.includes(normName);
+      });
+      if (candidates.length === 1) {
+        matchedAdmin = candidates[0];
+      } else if (candidates.length > 1) {
+        setErrorMessage(
+          'Mais de um membro administrativo corresponde a esse nome. Informe seu usuário de login completo.'
+        );
+        return;
+      }
+    }
+
+    if (!matchedAdmin) {
+      const isTeacher = teacherUsers.some(
+        (t) =>
+          normalize(t.name) === normInput ||
+          normalize(t.username || '') === normInput ||
+          normalize(t.email || '') === normInput
+      );
+
+      if (isTeacher) {
+        setErrorMessage(
+          'Este usuário pertence a um professor. Por favor, utilize a aba Acesso do Professor.'
+        );
+        return;
+      }
+
       setErrorMessage(
-        'Este usuário pertence a um professor. Por favor, utilize a aba Acesso do Professor.'
+        `Usuário administrativo "${rawInput}" não encontrado. Verifique seu login na aba Equipe Admin.`
       );
       return;
     }
 
-    const expectedUsername = (diretoraUser?.username || 'admin').trim().toLowerCase();
-    const expectedEmail = (diretoraUser?.email || 'diretoria@escola.gov.br').trim().toLowerCase();
-    const expectedName = diretoraUser ? normalize(diretoraUser.name) : '';
-
-    const matchesDirector =
-      cleanInput === expectedUsername ||
-      cleanInput === expectedEmail ||
-      (expectedName !== '' && normalize(cleanInput) === expectedName);
-
-    if (!matchesDirector) {
-      setErrorMessage(
-        'Usuário da Diretoria inválido. Verifique o usuário ou e-mail cadastrado.'
-      );
-      return;
-    }
-
-    const expectedPass = diretoraUser?.password || '123';
+    const expectedPass = matchedAdmin.password || '123';
     if (cleanPass !== expectedPass) {
-      setErrorMessage('Senha incorreta para a Diretoria.');
+      setErrorMessage(`Senha incorreta para ${matchedAdmin.name}.`);
       return;
     }
 
-    if (diretoraUser) {
-      onLoginSuccess(diretoraUser);
-    }
+    onLoginSuccess(matchedAdmin);
   };
 
   return (
@@ -272,7 +279,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               }`}
             >
               <ShieldCheck className="w-4 h-4 text-slate-700" />
-              <span>Acesso da Diretoria</span>
+              <span>Acesso Administrativo</span>
             </button>
           </div>
 
@@ -376,44 +383,38 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
             )}
 
-            {/* TAB 2: DIRETORA LOGIN */}
+            {/* TAB 2: ADMINISTRATIVE TEAM LOGIN */}
             {activeTab === 'diretora' && (
               <div>
                 <div className="mb-5 pb-3 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">
-                      Painel da Direção Escolar
+                      Equipe Administrativa & Direção
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Liberação de fichas e homologação
+                      Direção, Secretaria, Coordenação e Pedagogia
                     </p>
                   </div>
                   <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                    Acesso Restrito
+                    Acesso Individual
                   </span>
                 </div>
 
                 <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-700 text-xs">
                   <div className="flex items-center gap-2 font-medium mb-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-slate-800 shrink-0" />
-                    <span>
-                      {usesDefaultAdminCreds
-                        ? 'Credenciais iniciais padrão:'
-                        : 'Acesso da Direção:'}
-                    </span>
+                    <span>Login individual por membro da equipe:</span>
                   </div>
-                  <p className="text-[11px] text-slate-600 ml-5 font-mono">
-                    {usesDefaultAdminCreds
-                      ? <>Usuário: <strong>admin</strong> | Senha: <strong>123</strong></>
-                      : 'Informe o usuário (ou e-mail) e a senha configurados no perfil.'}
+                  <p className="text-[11px] text-slate-600 ml-5">
+                    Informe seu <strong>usuário</strong> (ou nome/e-mail) e sua <strong>senha pessoal</strong>. A senha inicial padrão é <span className="font-mono font-semibold">123</span>.
                   </p>
                 </div>
 
                 <form onSubmit={handleDiretoraSubmit} className="space-y-4">
-                  {/* Director Username */}
+                  {/* Admin Username */}
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Usuário ou E-mail da Diretoria
+                      Usuário, Nome ou E-mail
                     </label>
                     <div className="relative">
                       <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -421,12 +422,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                         type="text"
                         required
                         id="input-diretora-user"
-                        placeholder={usesDefaultAdminCreds ? 'admin' : 'Digite seu usuário ou e-mail'}
+                        placeholder="Ex: valdirene.sperandio ou admin"
                         value={diretoraInput}
-                        onChange={(e) => {
-                          setHasEditedDiretoraInput(true);
-                          setDiretoraInput(e.target.value);
-                        }}
+                        onChange={(e) => setDiretoraInput(e.target.value)}
                         className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-mono font-medium"
                       />
                     </div>
@@ -443,7 +441,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                         type={showDiretoraPassword ? 'text' : 'password'}
                         required
                         id="input-diretora-password"
-                        placeholder={usesDefaultAdminCreds ? '123' : 'Digite sua senha'}
+                        placeholder="Digite sua senha"
                         value={diretoraPassword}
                         onChange={(e) => setDiretoraPassword(e.target.value)}
                         className="w-full pl-9 pr-10 py-2.5 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-mono"
@@ -471,7 +469,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
                     >
                       <ShieldCheck className="w-4 h-4" />
-                      <span>Entrar como Diretora</span>
+                      <span>Entrar no Painel Administrativo</span>
                     </button>
                   </div>
                 </form>

@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   UserCog,
   BookOpen,
+  ShieldCheck,
 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SCHOOL_NAME, SCHOOL_SUBTITLE } from '../data/initialData';
@@ -255,6 +256,19 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
 
                 <button
+                  id="tab-diretora-admin-team"
+                  onClick={() => onSelectTab('admin-team')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                    activeTab === 'admin-team'
+                      ? 'bg-slate-900 text-white font-semibold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Equipe Admin</span>
+                </button>
+
+                <button
                   id="tab-diretora-questions"
                   onClick={() => onSelectTab('questions')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
@@ -336,12 +350,14 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentUser.name.charAt(0)}
                 </div>
                 <div className="text-left text-xs leading-tight">
-                  <p className="font-semibold text-slate-900 truncate max-w-[140px] group-hover:text-amber-900">
+                  <p className="font-semibold text-slate-900 truncate max-w-[150px] group-hover:text-amber-900">
                     {currentUser.name}
                   </p>
-                  <p className="text-[11px] text-amber-700 font-semibold flex items-center gap-1">
-                    <UserCog className="w-3 h-3" />
-                    <span>Editar Perfil</span>
+                  <p className="text-[11px] text-amber-700 font-semibold flex items-center gap-1 truncate max-w-[170px]">
+                    <UserCog className="w-3 h-3 shrink-0" />
+                    <span className="truncate">
+                      {currentUser.position ? `${currentUser.position} · Perfil` : 'Editar Perfil'}
+                    </span>
                   </p>
                 </div>
               </button>
@@ -354,8 +370,8 @@ export const Header: React.FC<HeaderProps> = ({
                   <p className="font-semibold text-slate-900 truncate max-w-[140px]">
                     {currentUser.name}
                   </p>
-                  <p className="text-[11px] text-slate-500 font-medium truncate max-w-[160px]" title={isDiretora ? 'Diretoria Escolar' : currentUser.subject || 'Docente'}>
-                    {isDiretora ? 'Diretoria Escolar' : currentUser.subject || 'Docente'}
+                  <p className="text-[11px] text-slate-500 font-medium truncate max-w-[160px]" title={isDiretora ? currentUser.position || 'Equipe Administrativa' : currentUser.subject || 'Docente'}>
+                    {isDiretora ? currentUser.position || 'Equipe Administrativa' : currentUser.subject || 'Docente'}
                   </p>
                 </div>
               </div>

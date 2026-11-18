@@ -8,6 +8,7 @@ export interface User {
   username?: string;
   password?: string;
   role: UserRole;
+  position?: string; // Cargo ou função administrativa (ex: Direção Geral, Secretário, Pedagogo)
   subject?: string; // Componente curricular principal ou lista separada por vírgula
   subjects?: string[]; // Múltiplos componentes curriculares lecionados
   classes?: string[]; // Turmas atribuídas

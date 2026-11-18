@@ -11,6 +11,7 @@
         "username": { "type": "string", "description": "Nome de usuário de acesso" },
         "password": { "type": "string", "description": "Senha de acesso" },
         "role": { "type": "string", "enum": ["diretora", "professor"], "description": "Papel no sistema" },
+        "position": { "type": "string", "description": "Cargo ou função administrativa (ex: Direção Geral, Direção Auxiliar, Secretário, Coordenador Técnico, Pedagogo)" },
         "subject": { "type": "string", "description": "Disciplina ou componente lecionado" },
         "subjects": { "type": "array", "description": "Lista de matérias ou componentes lecionados pelo professor" },
         "classes": { "type": "array", "description": "Turmas atribuídas" },

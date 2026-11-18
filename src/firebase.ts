@@ -24,6 +24,7 @@ import {
 } from './types';
 import {
   INITIAL_USERS,
+  INITIAL_ADMIN_TEAM,
   INITIAL_QUESTIONS,
   INITIAL_SECTIONS,
   INITIAL_REPORTS,
@@ -112,6 +113,7 @@ testConnection().catch(() => {});
 
 export type SeedCollectionKey =
   | 'users'
+  | 'admin_team_v1'
   | 'sections'
   | 'questions'
   | 'reports'
@@ -164,6 +166,7 @@ export async function markCollectionSeeded(key: SeedCollectionKey): Promise<void
 export async function markAllCollectionsSeeded(): Promise<void> {
   const allFlags: Record<SeedCollectionKey, boolean> = {
     users: true,
+    admin_team_v1: true,
     sections: true,
     questions: true,
     reports: true,
@@ -246,6 +249,80 @@ async function handleEmptyCollectionSnapshot<T extends { id: string }>(
 
 // 5. Real-time Subscriptions with One-Time Auto-Seeding
 
+function normalizeSeedKey(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function ensureInitialAdminTeamSeeded(existingUsers: User[]): Promise<void> {
+  const localState = readLocalSeedState();
+  if (seededMemory.admin_team_v1 || localState.admin_team_v1 === true) {
+    seededMemory.admin_team_v1 = true;
+    return;
+  }
+
+  if (inFlightSeeding.admin_team_v1) {
+    return;
+  }
+
+  inFlightSeeding.admin_team_v1 = true;
+  try {
+    const alreadySeeded = await isCollectionAlreadySeeded('admin_team_v1');
+    if (alreadySeeded) {
+      return;
+    }
+
+    const batch = writeBatch(db);
+    let hasWrites = false;
+
+    for (const member of INITIAL_ADMIN_TEAM) {
+      const existingById = existingUsers.find((u) => u.id === member.id);
+      if (existingById) {
+        // Preserve custom name, username, password and email; only add position if missing
+        if (!existingById.position && member.position) {
+          batch.set(
+            doc(db, 'users', existingById.id),
+            { position: member.position },
+            { merge: true }
+          );
+          hasWrites = true;
+        }
+        continue;
+      }
+
+      const normMemberName = normalizeSeedKey(member.name);
+      const normMemberUsername = normalizeSeedKey(member.username || '');
+      const duplicateExists = existingUsers.some((u) => {
+        const normExistingName = normalizeSeedKey(u.name);
+        const normExistingUsername = normalizeSeedKey(u.username || '');
+        return (
+          normExistingName.includes(normMemberName) ||
+          normMemberName.includes(normExistingName) ||
+          (normMemberUsername !== '' && normExistingUsername === normMemberUsername)
+        );
+      });
+
+      if (!duplicateExists) {
+        batch.set(doc(db, 'users', member.id), sanitizeForFirestore(member));
+        hasWrites = true;
+      }
+    }
+
+    if (hasWrites) {
+      await batch.commit();
+    }
+    await markCollectionSeeded('admin_team_v1');
+  } catch (error) {
+    console.warn('Could not seed initial admin team members:', error);
+  } finally {
+    inFlightSeeding.admin_team_v1 = false;
+  }
+}
+
 export function subscribeUsers(callback: (users: User[]) => void): Unsubscribe {
   const path = 'users';
   return onSnapshot(
@@ -256,6 +333,7 @@ export function subscribeUsers(callback: (users: User[]) => void): Unsubscribe {
       } else {
         void markCollectionSeeded('users');
         const users = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as User));
+        void ensureInitialAdminTeamSeeded(users);
         callback(users);
       }
     },

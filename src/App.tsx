@@ -80,6 +80,7 @@ import { ClassPanorama } from './components/ClassPanorama';
 import { ClassPerformance } from './components/ClassPerformance';
 import { ReportViewModal } from './components/ReportViewModal';
 import { AdminProfileModal } from './components/AdminProfileModal';
+import { AdminTeamManagement } from './components/AdminTeamManagement';
 import { CheckCircle2 } from 'lucide-react';
 
 import firebaseConfig from '../firebase-applet-config.json';
@@ -248,7 +249,8 @@ export default function App() {
 
     if (user.role === 'diretora') {
       setActiveTab('archive');
-      showToast(`Bem-vinda, ${user.name}! Painel da Diretoria sincronizado em tempo real.`);
+      const roleLabel = user.position ? ` (${user.position})` : '';
+      showToast(`Bem-vindo(a), ${user.name}${roleLabel}! Painel administrativo conectado.`);
     } else {
       setActiveTab('my-reports');
       showToast(`Bem-vindo(a), Prof. ${user.name}! Painel docente conectado.`);
@@ -340,6 +342,10 @@ export default function App() {
     const target = reports.find((r) => r.id === reportId);
     if (!target) return;
 
+    const signerLabel = currentUser?.name
+      ? `${currentUser.name}${currentUser.position ? ` (${currentUser.position})` : ''}`
+      : undefined;
+
     let updatedReport: PreCouncilReport;
     if (signatureType === 'diretora') {
       updatedReport = {
@@ -347,7 +353,7 @@ export default function App() {
         status: 'visto' as const,
         diretoraSignature: {
           signed: true,
-          signedBy: currentUser?.name || 'Diretora Geral',
+          signedBy: signerLabel || 'Direção Geral',
           signedAt: new Date().toISOString(),
         },
       };
@@ -356,7 +362,7 @@ export default function App() {
         ...target,
         pedagogaSignature: {
           signed: true,
-          signedBy: 'Coordenação Pedagógica',
+          signedBy: signerLabel || 'Coordenação Pedagógica',
           signedAt: new Date().toISOString(),
         },
       };
@@ -379,6 +385,10 @@ export default function App() {
     const target = reports.find((r) => r.id === reportId);
     if (!target) return;
 
+    const signerLabel = currentUser?.name
+      ? `${currentUser.name}${currentUser.position ? ` (${currentUser.position})` : ''}`
+      : undefined;
+
     let updatedReport: PreCouncilReport;
     if (role === 'diretora') {
       updatedReport = {
@@ -386,7 +396,7 @@ export default function App() {
         status: 'visto' as const,
         diretoraSignature: {
           signed: true,
-          signedBy: currentUser?.name || 'Diretora Geral',
+          signedBy: signerLabel || 'Direção Geral',
           signedAt: new Date().toISOString(),
           notes: notes || undefined,
         },
@@ -396,7 +406,7 @@ export default function App() {
         ...target,
         pedagogaSignature: {
           signed: true,
-          signedBy: 'Coordenação Pedagógica',
+          signedBy: signerLabel || 'Coordenação Pedagógica',
           signedAt: new Date().toISOString(),
           notes: notes || undefined,
         },
@@ -463,6 +473,41 @@ export default function App() {
     persistCurrentUser(updatedAdmin);
     await saveUserDoc(updatedAdmin);
     showToast('Seus dados de acesso e perfil foram atualizados e salvos na nuvem!');
+  };
+
+  // Administrative Team CRUD actions
+  const handleAddAdminUser = async (newAdmin: User) => {
+    setUsers((prev) => {
+      const updated = [...prev, newAdmin];
+      saveStoredUsers(updated);
+      return updated;
+    });
+    await saveUserDoc(newAdmin);
+    showToast(`Acesso de ${newAdmin.name} criado e sincronizado na nuvem!`);
+  };
+
+  const handleUpdateAdminUser = async (updatedAdmin: User) => {
+    setUsers((prev) => {
+      const updated = prev.map((u) => (u.id === updatedAdmin.id ? updatedAdmin : u));
+      saveStoredUsers(updated);
+      return updated;
+    });
+    if (currentUser?.id === updatedAdmin.id) {
+      setCurrentUserState(updatedAdmin);
+      persistCurrentUser(updatedAdmin);
+    }
+    await saveUserDoc(updatedAdmin);
+    showToast(`Dados de ${updatedAdmin.name} atualizados com sucesso.`);
+  };
+
+  const handleDeleteAdminUser = async (adminId: string) => {
+    setUsers((prev) => {
+      const updated = prev.filter((u) => u.id !== adminId);
+      saveStoredUsers(updated);
+      return updated;
+    });
+    await deleteUserDoc(adminId);
+    showToast('Acesso administrativo removido com sucesso.');
   };
 
   // Question management actions
@@ -732,6 +777,7 @@ export default function App() {
 
   const isDiretora = currentUser.role === 'diretora';
   const onlyTeachers = users.filter((u) => u.role === 'professor');
+  const onlyAdminUsers = users.filter((u) => u.role === 'diretora');
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans print:block print:min-h-0 print:bg-white">
@@ -865,6 +911,17 @@ export default function App() {
                 onUpdateTeacher={handleUpdateTeacher}
                 onDeleteTeacher={handleDeleteTeacher}
                 onAddSubject={handleAddSubject}
+              />
+            )}
+
+            {activeTab === 'admin-team' && (
+              <AdminTeamManagement
+                adminUsers={onlyAdminUsers}
+                allUsers={users}
+                currentUser={currentUser}
+                onAddAdminUser={handleAddAdminUser}
+                onUpdateAdminUser={handleUpdateAdminUser}
+                onDeleteAdminUser={handleDeleteAdminUser}
               />
             )}
 
