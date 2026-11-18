@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { User, SchoolClass } from '../types';
+import * as XLSX from 'xlsx';
 import {
   AVAILABLE_CLASSES,
   AVAILABLE_SUBJECTS,
@@ -13,10 +14,15 @@ import {
   BookOpen,
   Layers,
   CheckCircle,
-  LogIn,
   Search,
   KeyRound,
   Lock,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  AlertCircle,
+  Check,
+  X,
 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -24,20 +30,107 @@ interface TeacherManagementProps {
   teachers: User[];
   classes?: SchoolClass[];
   onAddTeacher: (newTeacher: User) => void;
+  onAddMultipleTeachers?: (newTeachers: User[]) => void;
   onUpdateTeacher: (teacher: User) => void;
   onDeleteTeacher: (teacherId: string) => void;
+}
+
+interface ImportedTeacherPreview {
+  existingId?: string;
+  name: string;
+  subject: string;
+  classes: string[];
+  email: string;
+  password: string;
+}
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function generateInstitutionEmail(name: string): string {
+  const local = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '');
+  return `${local || 'professor'}@escola.gov.br`;
+}
+
+function compactClassKey(value: string): string {
+  return normalizeText(value)
+    .replace(/[º°ª]/g, '')
+    .replace(/\b(ano|serie|turma)\b/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function matchClassName(rawClass: string, availableClassNames: string[]): string {
+  const trimmed = rawClass.trim();
+  if (!trimmed) return '';
+
+  const normRaw = normalizeText(trimmed);
+  const exactMatch = availableClassNames.find((c) => normalizeText(c) === normRaw);
+  if (exactMatch) return exactMatch;
+
+  const compactRaw = compactClassKey(trimmed);
+  if (compactRaw) {
+    const compactMatch = availableClassNames.find(
+      (c) => compactClassKey(c) === compactRaw
+    );
+    if (compactMatch) return compactMatch;
+  }
+
+  return trimmed;
+}
+
+function parseClassList(rawValue: string, availableClassNames: string[]): string[] {
+  if (!rawValue) return [];
+  const parts = rawValue
+    .split(/[,;|\n]+|\s+\/\s+/)
+    .map((p) => matchClassName(p, availableClassNames))
+    .filter(Boolean);
+  return Array.from(new Set(parts));
+}
+
+function matchSubjectName(rawSubject: string): string {
+  const trimmed = rawSubject.trim();
+  if (!trimmed) return '';
+
+  const normRaw = normalizeText(trimmed);
+  const exact = AVAILABLE_SUBJECTS.find((s) => normalizeText(s) === normRaw);
+  if (exact) return exact;
+
+  if (normRaw === 'portugues' || normRaw === 'lingua portuguesa') {
+    return 'Língua Portuguesa';
+  }
+  if (normRaw === 'ingles' || normRaw === 'lingua inglesa') {
+    return 'Língua Inglesa';
+  }
+  if (normRaw === 'ciencias' || normRaw === 'ciencias da natureza') {
+    return 'Ciências da Natureza';
+  }
+
+  return trimmed;
 }
 
 export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   teachers,
   classes,
   onAddTeacher,
+  onAddMultipleTeachers,
   onUpdateTeacher,
   onDeleteTeacher,
 }) => {
   const availableClassNames =
     classes && classes.length > 0 ? classes.map((c) => c.name) : AVAILABLE_CLASSES;
   const [showForm, setShowForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
 
   // Form states
@@ -45,10 +138,18 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('123');
   const [subject, setSubject] = useState(AVAILABLE_SUBJECTS[0]);
-  const [selectedClasses, setSelectedClasses] = useState<string[]>(['6º Ano A']);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([
+    availableClassNames[0] || '6º Ano A',
+  ]);
   const [searchTerm, setSearchTerm] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [teacherToDelete, setTeacherToDelete] = useState<User | null>(null);
+
+  // Excel Import states
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importedPreview, setImportedPreview] = useState<ImportedTeacherPreview[]>([]);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const formRef = useRef<HTMLDivElement | null>(null);
 
@@ -57,7 +158,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     setEmail('');
     setPassword('123');
     setSubject(AVAILABLE_SUBJECTS[0]);
-    setSelectedClasses(['6º Ano A']);
+    setSelectedClasses([availableClassNames[0] || '6º Ano A']);
     setEditingTeacherId(null);
     setShowForm(false);
   };
@@ -97,13 +198,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     }
 
     const cleanName = name.trim();
-    const cleanEmail =
-      email.trim() ||
-      `${cleanName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '.')}@escola.gov.br`;
+    const cleanEmail = email.trim() || generateInstitutionEmail(cleanName);
     const cleanPass = password.trim() || '123';
 
     if (editingTeacherId) {
@@ -133,11 +228,332 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         createdAt: new Date().toISOString().split('T')[0],
       };
       onAddTeacher(newTeacher);
-      setFeedbackMsg(`Professor(a) "${cleanName}" cadastrado com sucesso! Usuário: "${cleanName}" | Senha: "123".`);
+      setFeedbackMsg(
+        `Professor(a) "${cleanName}" cadastrado com sucesso! Usuário: "${cleanName}" | Senha: "${cleanPass}".`
+      );
     }
 
     setTimeout(() => setFeedbackMsg(null), 4000);
     resetForm();
+  };
+
+  // Excel / CSV File Upload Handler
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError(null);
+    setImportedPreview([]);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const buffer = evt.target?.result;
+        if (!buffer) {
+          setImportError('Não foi possível ler o arquivo selecionado.');
+          return;
+        }
+
+        const workbook = XLSX.read(new Uint8Array(buffer as ArrayBuffer), {
+          type: 'array',
+        });
+
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (rawRows.length < 2) {
+          setImportError('A planilha parece vazia ou sem linhas de dados.');
+          return;
+        }
+
+        // Find header row within the first 5 non-empty rows
+        let headerRowIdx = 0;
+        for (let r = 0; r < Math.min(rawRows.length, 5); r++) {
+          const rowText = (rawRows[r] || [])
+            .map((cell) => normalizeText(String(cell || '')))
+            .join(' ');
+          if (
+            rowText.includes('nome') ||
+            rowText.includes('professor') ||
+            rowText.includes('docente') ||
+            rowText.includes('turma') ||
+            rowText.includes('materia') ||
+            rowText.includes('disciplina')
+          ) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+
+        const headers: string[] = (rawRows[headerRowIdx] || []).map((h: any) =>
+          normalizeText(String(h || ''))
+        );
+
+        let nameIdx = headers.findIndex(
+          (h) =>
+            h.includes('nome') ||
+            h.includes('professor') ||
+            h.includes('professora') ||
+            h.includes('docente') ||
+            h === 'name'
+        );
+        const classIdx = headers.findIndex(
+          (h) =>
+            h.includes('turma') ||
+            h.includes('classe') ||
+            h.includes('serie') ||
+            h.includes('ano')
+        );
+        const subjectIdx = headers.findIndex(
+          (h) =>
+            h.includes('materia') ||
+            h.includes('disciplina') ||
+            h.includes('componente') ||
+            h.includes('subject')
+        );
+        const emailIdx = headers.findIndex((h) => h.includes('email') || h.includes('e-mail'));
+        const passwordIdx = headers.findIndex(
+          (h) => h.includes('senha') || h.includes('password')
+        );
+
+        if (nameIdx === -1) {
+          nameIdx = 0;
+        }
+
+        // Group rows by normalized teacher name so multiple rows for the same teacher merge automatically
+        const grouped = new Map<
+          string,
+          {
+            name: string;
+            subjects: string[];
+            classes: string[];
+            email: string;
+            password: string;
+          }
+        >();
+
+        for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
+          const row = rawRows[i];
+          if (!row || row.length === 0) continue;
+
+          const rawName = row[nameIdx] !== undefined && row[nameIdx] !== null
+            ? String(row[nameIdx]).trim()
+            : '';
+          if (!rawName) continue;
+
+          const normName = normalizeText(rawName);
+          const rawClass =
+            classIdx >= 0 && row[classIdx] !== undefined && row[classIdx] !== null
+              ? String(row[classIdx]).trim()
+              : '';
+          const rawSubject =
+            subjectIdx >= 0 && row[subjectIdx] !== undefined && row[subjectIdx] !== null
+              ? String(row[subjectIdx]).trim()
+              : '';
+          const rawEmail =
+            emailIdx >= 0 && row[emailIdx] !== undefined && row[emailIdx] !== null
+              ? String(row[emailIdx]).trim()
+              : '';
+          const rawPassword =
+            passwordIdx >= 0 && row[passwordIdx] !== undefined && row[passwordIdx] !== null
+              ? String(row[passwordIdx]).trim()
+              : '';
+
+          const parsedClasses = parseClassList(rawClass, availableClassNames);
+          const parsedSubjects = rawSubject
+            .split(/[,;|\n]+/)
+            .map((s) => matchSubjectName(s))
+            .filter(Boolean);
+
+          const existingEntry = grouped.get(normName);
+          if (existingEntry) {
+            parsedClasses.forEach((c) => {
+              if (!existingEntry.classes.includes(c)) existingEntry.classes.push(c);
+            });
+            parsedSubjects.forEach((s) => {
+              if (!existingEntry.subjects.includes(s)) existingEntry.subjects.push(s);
+            });
+            if (!existingEntry.email && rawEmail) existingEntry.email = rawEmail;
+            if (!existingEntry.password && rawPassword) existingEntry.password = rawPassword;
+          } else {
+            grouped.set(normName, {
+              name: rawName,
+              subjects: Array.from(new Set(parsedSubjects)),
+              classes: parsedClasses,
+              email: rawEmail,
+              password: rawPassword,
+            });
+          }
+        }
+
+        if (grouped.size === 0) {
+          setImportError(
+            'Nenhum professor foi localizado na planilha informada. Verifique se há uma coluna com o nome do professor.'
+          );
+          return;
+        }
+
+        const existingByName = new Map<string, User>(
+          teachers.map((t) => [normalizeText(t.name), t])
+        );
+
+        const previewList: ImportedTeacherPreview[] = Array.from(grouped.values()).map(
+          (entry) => {
+            const existingTeacher = existingByName.get(normalizeText(entry.name));
+            const mergedClasses = existingTeacher
+              ? Array.from(new Set([...(existingTeacher.classes || []), ...entry.classes]))
+              : entry.classes;
+
+            const mergedSubject =
+              entry.subjects.length > 0
+                ? entry.subjects.join(', ')
+                : existingTeacher?.subject || AVAILABLE_SUBJECTS[0];
+
+            return {
+              existingId: existingTeacher?.id,
+              name: existingTeacher?.name || entry.name,
+              subject: mergedSubject,
+              classes: mergedClasses,
+              email:
+                entry.email ||
+                existingTeacher?.email ||
+                generateInstitutionEmail(entry.name),
+              password: entry.password || existingTeacher?.password || '123',
+            };
+          }
+        );
+
+        setImportedPreview(previewList);
+      } catch (err) {
+        console.error('Error reading teachers excel file', err);
+        setImportError(
+          'Falha ao ler arquivo. Verifique se o arquivo está no formato Excel (.xlsx, .xls) ou CSV válido.'
+        );
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleConfirmImport = () => {
+    if (importedPreview.length === 0) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowStamp = Date.now();
+    const existingById = new Map<string, User>(teachers.map((t) => [t.id, t]));
+
+    const usersToSave: User[] = importedPreview.map((item, idx) => {
+      const existing = item.existingId ? existingById.get(item.existingId) : undefined;
+      if (existing) {
+        return {
+          ...existing,
+          name: item.name,
+          username: existing.username || item.name,
+          email: item.email,
+          password: item.password,
+          subject: item.subject,
+          classes: item.classes,
+        };
+      }
+      return {
+        id: `prof-imp-${nowStamp}-${idx}`,
+        name: item.name,
+        username: item.name,
+        email: item.email,
+        password: item.password,
+        role: 'professor',
+        subject: item.subject,
+        classes: item.classes,
+        createdAt: todayStr,
+      };
+    });
+
+    if (onAddMultipleTeachers) {
+      onAddMultipleTeachers(usersToSave);
+    } else {
+      usersToSave.forEach((u) => {
+        if (existingById.has(u.id)) {
+          onUpdateTeacher(u);
+        } else {
+          onAddTeacher(u);
+        }
+      });
+    }
+
+    const updatedCount = importedPreview.filter((i) => !!i.existingId).length;
+    const newCount = importedPreview.length - updatedCount;
+    setFeedbackMsg(
+      updatedCount > 0
+        ? `Importação concluída: ${newCount} professor(es) novo(s) e ${updatedCount} atualizado(s)!`
+        : `${newCount} professor(es) importado(s) com sucesso a partir da planilha!`
+    );
+    setTimeout(() => setFeedbackMsg(null), 5000);
+
+    setImportedPreview([]);
+    setImportFileName(null);
+    setImportError(null);
+    setShowImportModal(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Download template Excel for Teachers
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        'Nome do Professor': 'Carlos Eduardo Souza',
+        'Matéria': 'Matemática',
+        'Turmas': '6º Ano A, 7º Ano B, 8º Ano A',
+        'E-mail': 'carlos.souza@escola.gov.br',
+        'Senha': '123',
+      },
+      {
+        'Nome do Professor': 'Ana Paula Oliveira',
+        'Matéria': 'Língua Portuguesa',
+        'Turmas': '6º Ano A, 9º Ano A, 1º Ano EM',
+        'E-mail': '',
+        'Senha': '',
+      },
+      {
+        'Nome do Professor': 'Roberto Silva Lima',
+        'Matéria': 'Ciências da Natureza',
+        'Turmas': '6º Ano B',
+        'E-mail': '',
+        'Senha': '',
+      },
+      {
+        'Nome do Professor': 'Roberto Silva Lima',
+        'Matéria': 'Ciências da Natureza',
+        'Turmas': '7º Ano A',
+        'E-mail': '',
+        'Senha': '',
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Professores_Modelo');
+    XLSX.writeFile(workbook, 'modelo_cadastro_professores.xlsx');
+  };
+
+  // Export current teachers to Excel
+  const handleExportTeachers = () => {
+    const listToExport = filteredTeachers.map((t) => ({
+      'Nome do Professor': t.name,
+      'Matéria': t.subject || '',
+      'Turmas': (t.classes || []).join(', '),
+      'E-mail': t.email,
+      'Senha': t.password || '123',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(listToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Professores');
+    XLSX.writeFile(
+      workbook,
+      `professores_${new Date().toISOString().split('T')[0]}.xlsx`
+    );
   };
 
   const filteredTeachers = teachers.filter((t) => {
@@ -145,9 +561,20 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     return (
       t.name.toLowerCase().includes(q) ||
       t.email.toLowerCase().includes(q) ||
-      (t.subject && t.subject.toLowerCase().includes(q))
+      (t.subject && t.subject.toLowerCase().includes(q)) ||
+      (t.classes && t.classes.some((c) => c.toLowerCase().includes(q)))
     );
   });
+
+  // Ensure subject select always shows current custom subject if imported
+  const subjectOptions = AVAILABLE_SUBJECTS.includes(subject)
+    ? AVAILABLE_SUBJECTS
+    : [subject, ...AVAILABLE_SUBJECTS];
+
+  // Ensure class checkboxes include any extra imported classes
+  const allClassOptions = Array.from(
+    new Set([...availableClassNames, ...selectedClasses])
+  );
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -157,28 +584,55 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-amber-700" />
             <h2 className="text-xl font-bold text-stone-900">
-              Cadastro e Gestão de Professores
+              Cadastro de Professores & Importação Excel
             </h2>
           </div>
           <p className="text-xs text-stone-500 mt-1">
-            Cadastre os docentes que lecionam na escola para que possam preencher e enviar suas fichas de pré-conselho.
+            Cadastre docentes manualmente ou importe em lote pela planilha Excel (.xlsx) ou CSV com nome, turma e matéria.
           </p>
         </div>
 
-        {!showForm && (
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            id="btn-add-teacher"
-            onClick={() => {
-              resetForm();
-              setShowForm(true);
-              scrollToForm();
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0"
+            type="button"
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+            title="Baixar planilha modelo do Excel para professores"
           >
-            <UserPlus className="w-4 h-4" />
-            <span>+ Cadastrar Novo Professor</span>
+            <Download className="w-3.5 h-3.5 text-stone-500" />
+            <span>Baixar Modelo Excel</span>
           </button>
-        )}
+
+          <button
+            type="button"
+            id="btn-open-teacher-excel-import"
+            onClick={() => {
+              setImportError(null);
+              setImportedPreview([]);
+              setImportFileName(null);
+              setShowImportModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Importar Arquivo Excel / CSV</span>
+          </button>
+
+          {!showForm && (
+            <button
+              id="btn-add-teacher"
+              onClick={() => {
+                resetForm();
+                setShowForm(true);
+                scrollToForm();
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Cadastrar Professor</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {feedbackMsg && (
@@ -260,14 +714,14 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
             {/* Disciplina */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 mb-1">
-                Componente Curricular Principal
+                Componente Curricular / Matéria Principal
               </label>
               <select
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500"
               >
-                {AVAILABLE_SUBJECTS.map((sub) => (
+                {subjectOptions.map((sub) => (
                   <option key={sub} value={sub}>
                     {sub}
                   </option>
@@ -281,7 +735,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                 Turmas em que o docente leciona:
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 bg-stone-50 p-3 rounded-xl border border-stone-200">
-                {availableClassNames.map((cls) => {
+                {allClassOptions.map((cls) => {
                   const isChecked = selectedClasses.includes(cls);
                   return (
                     <label
@@ -326,24 +780,193 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         </div>
       )}
 
+      {/* EXCEL IMPORT MODAL */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex justify-center items-center p-4">
+          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl border border-stone-200 overflow-hidden">
+            <div className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold">
+                  Importar Professores via Arquivo Excel ou CSV
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowImportModal(false)}
+                className="text-stone-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {importError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{importError}</span>
+                </div>
+              )}
+
+              {/* Upload Drop Zone */}
+              <div className="border-2 border-dashed border-stone-300 hover:border-emerald-500 rounded-2xl p-6 text-center bg-stone-50/50 transition-colors">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="teacher-excel-upload-input"
+                />
+                <label
+                  htmlFor="teacher-excel-upload-input"
+                  className="cursor-pointer flex flex-col items-center justify-center"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <span className="text-xs font-bold text-stone-800">
+                    {importFileName
+                      ? `Arquivo selecionado: ${importFileName}`
+                      : 'Clique para escolher a planilha Excel (.xlsx, .xls) ou CSV'}
+                  </span>
+                  <span className="text-[11px] text-stone-500 mt-1">
+                    Colunas reconhecidas: <strong>Nome do Professor</strong>, <strong>Turma(s)</strong>, <strong>Matéria / Disciplina</strong> (e opcionalmente E-mail e Senha)
+                  </span>
+                </label>
+              </div>
+
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-[11px] text-stone-600 space-y-1">
+                <p className="font-bold text-stone-800">Como sua planilha pode estar organizada:</p>
+                <p>
+                  • <strong>Várias turmas na mesma linha:</strong> separadas por vírgula ou ponto e vírgula (ex: <code className="bg-white px-1 py-0.5 rounded border border-stone-200">6º Ano A, 7º Ano B, 1º Ano EM</code>).
+                </p>
+                <p>
+                  • <strong>Uma turma por linha:</strong> se o mesmo professor aparecer em várias linhas, o sistema agrupa todas as turmas dele automaticamente.
+                </p>
+                <p>
+                  • Senha padrão quando não informada na planilha: <code className="bg-white px-1 py-0.5 rounded border border-stone-200 font-bold">123</code>.
+                </p>
+              </div>
+
+              {/* Preview Table */}
+              {importedPreview.length > 0 && (
+                <div className="border border-stone-200 rounded-xl overflow-hidden">
+                  <div className="bg-stone-100 px-4 py-2 border-b border-stone-200 flex items-center justify-between text-xs">
+                    <span className="font-bold text-stone-800">
+                      Prévia dos Professores Identificados ({importedPreview.length}):
+                    </span>
+                    <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Pronto para gravar</span>
+                    </span>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto divide-y divide-stone-100 text-xs">
+                    {importedPreview.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-stone-50"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-stone-900">{item.name}</span>
+                            {item.existingId ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                                Atualizar / Mesclar
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Novo
+                              </span>
+                            )}
+                            <span className="text-[11px] font-semibold text-stone-700 bg-stone-100 px-2 py-0.5 rounded border border-stone-200">
+                              {item.subject}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-stone-500">
+                            {item.email} · Senha: <span className="font-mono font-bold">{item.password}</span>
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1 sm:justify-end">
+                          {item.classes.length > 0 ? (
+                            item.classes.map((cls) => (
+                              <span
+                                key={cls}
+                                className="text-[10px] px-2 py-0.5 rounded bg-amber-50 border border-amber-200 font-semibold text-amber-900"
+                              >
+                                {cls}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-stone-400">Sem turma na planilha</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-stone-100 px-6 py-3 border-t border-stone-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(false)}
+                className="px-4 py-2 bg-white border border-stone-300 hover:bg-stone-50 rounded-xl text-xs font-semibold text-stone-700"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                id="btn-confirm-teacher-import-excel"
+                disabled={importedPreview.length === 0}
+                onClick={handleConfirmImport}
+                className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
+                  importedPreview.length > 0
+                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                    : 'bg-stone-300 text-stone-500 cursor-not-allowed'
+                }`}
+              >
+                <Check className="w-4 h-4" />
+                <span>Confirmar Importação de {importedPreview.length} Professores</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Teachers List */}
       <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
         {/* Search header */}
         <div className="p-4 border-b border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-50/50">
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar professor por nome ou disciplina..."
+              placeholder="Buscar professor por nome, matéria ou turma..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
-          <span className="text-xs text-stone-500">
-            Total: <strong>{filteredTeachers.length}</strong> professores ativos
-          </span>
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            <span className="text-xs text-stone-500">
+              Total: <strong>{filteredTeachers.length}</strong> professores ativos
+            </span>
+            <button
+              type="button"
+              onClick={handleExportTeachers}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              title="Exportar professores cadastrados para arquivo Excel"
+            >
+              <Download className="w-3.5 h-3.5 text-stone-500" />
+              <span>Exportar Lista (.xlsx)</span>
+            </button>
+          </div>
         </div>
 
         {/* Teachers Table */}

@@ -414,6 +414,24 @@ export async function saveUserDoc(user: User): Promise<void> {
   }
 }
 
+export async function batchSaveUsers(usersList: User[]): Promise<void> {
+  const path = 'users';
+  try {
+    await markCollectionSeeded('users');
+    const CHUNK_SIZE = 450;
+    for (let i = 0; i < usersList.length; i += CHUNK_SIZE) {
+      const chunk = usersList.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((user) => {
+        batch.set(doc(db, 'users', user.id), sanitizeForFirestore(user));
+      });
+      await batch.commit();
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
 export async function deleteUserDoc(userId: string): Promise<void> {
   const path = `users/${userId}`;
   try {

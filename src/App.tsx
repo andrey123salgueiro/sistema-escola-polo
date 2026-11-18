@@ -32,6 +32,7 @@ import {
   subscribeClasses,
   subscribeStudents,
   saveUserDoc,
+  batchSaveUsers,
   deleteUserDoc,
   saveQuestionDoc,
   deleteQuestionDoc,
@@ -400,6 +401,19 @@ export default function App() {
     showToast(`Professor(a) ${newTeacher.name} cadastrado(a) e salvo(a) na nuvem!`);
   };
 
+  const handleAddMultipleTeachers = async (importedTeachers: User[]) => {
+    if (importedTeachers.length === 0) return;
+    setUsers((prev) => {
+      const byId = new Map<string, User>(prev.map((u) => [u.id, u]));
+      importedTeachers.forEach((t) => byId.set(t.id, t));
+      const updated = Array.from(byId.values());
+      saveStoredUsers(updated);
+      return updated;
+    });
+    await batchSaveUsers(importedTeachers);
+    showToast(`${importedTeachers.length} professor(es) importado(s) e sincronizado(s) na nuvem!`);
+  };
+
   const handleUpdateTeacher = async (teacher: User) => {
     const updated = users.map((u) => (u.id === teacher.id ? teacher : u));
     setUsers(updated);
@@ -765,6 +779,7 @@ export default function App() {
                 teachers={onlyTeachers}
                 classes={classes}
                 onAddTeacher={handleAddTeacher}
+                onAddMultipleTeachers={handleAddMultipleTeachers}
                 onUpdateTeacher={handleUpdateTeacher}
                 onDeleteTeacher={handleDeleteTeacher}
               />
