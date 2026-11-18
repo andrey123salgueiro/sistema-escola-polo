@@ -4,6 +4,7 @@ import {
   User,
   PreCouncilReport,
   SchoolClass,
+  SchoolSubject,
   Student,
   ClassDimension,
 } from '../types';
@@ -258,6 +259,14 @@ export const AVAILABLE_SUBJECTS = [
   'Projeto de Vida',
   'Tecnologia e Inovação',
 ];
+
+export const INITIAL_SUBJECTS: SchoolSubject[] = AVAILABLE_SUBJECTS.map(
+  (name, idx) => ({
+    id: `sub-${idx + 1}`,
+    name,
+    createdAt: '2026-02-01',
+  })
+);
 
 export const INITIAL_REPORTS: PreCouncilReport[] = [
   {

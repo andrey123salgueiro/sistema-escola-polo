@@ -19,6 +19,7 @@ import {
   QuestionSection,
   PreCouncilReport,
   SchoolClass,
+  SchoolSubject,
   Student,
 } from './types';
 import {
@@ -27,6 +28,7 @@ import {
   INITIAL_SECTIONS,
   INITIAL_REPORTS,
   INITIAL_CLASSES,
+  INITIAL_SUBJECTS,
   INITIAL_STUDENTS,
   SCHOOL_NAME,
   SCHOOL_SUBTITLE,
@@ -114,6 +116,7 @@ export type SeedCollectionKey =
   | 'questions'
   | 'reports'
   | 'classes'
+  | 'subjects'
   | 'students';
 
 const DB_SCOPE = firebaseConfig.firestoreDatabaseId || 'default';
@@ -165,6 +168,7 @@ export async function markAllCollectionsSeeded(): Promise<void> {
     questions: true,
     reports: true,
     classes: true,
+    subjects: true,
     students: true,
   };
   Object.assign(seededMemory, allFlags);
@@ -382,6 +386,27 @@ export function subscribeStudents(callback: (students: Student[]) => void): Unsu
   );
 }
 
+export function subscribeSubjects(callback: (subjects: SchoolSubject[]) => void): Unsubscribe {
+  const path = 'subjects';
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      if (snapshot.empty) {
+        void handleEmptyCollectionSnapshot('subjects', path, INITIAL_SUBJECTS, callback);
+      } else {
+        void markCollectionSeeded('subjects');
+        const subjects = snapshot.docs
+          .map((d) => ({ ...d.data(), id: d.id } as SchoolSubject))
+          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+        callback(subjects);
+      }
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
+  );
+}
+
 // Helper: Recursively clean undefined values before sending to Firestore
 export function sanitizeForFirestore<T>(data: T): T {
   if (data === null || data === undefined) {
@@ -552,6 +577,26 @@ export async function deleteStudentDoc(studentId: string): Promise<void> {
   try {
     await markCollectionSeeded('students');
     await deleteDoc(doc(db, 'students', studentId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function saveSubjectDoc(subject: SchoolSubject): Promise<void> {
+  const path = `subjects/${subject.id}`;
+  try {
+    await markCollectionSeeded('subjects');
+    await setDoc(doc(db, 'subjects', subject.id), sanitizeForFirestore(subject));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteSubjectDoc(subjectId: string): Promise<void> {
+  const path = `subjects/${subjectId}`;
+  try {
+    await markCollectionSeeded('subjects');
+    await deleteDoc(doc(db, 'subjects', subjectId));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }

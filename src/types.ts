@@ -21,6 +21,13 @@ export interface SchoolClass {
   description?: string;
 }
 
+export interface SchoolSubject {
+  id: string;
+  name: string; // ex: 'Matemática'
+  area?: string; // ex: 'Ciências Exatas'
+  createdAt?: string;
+}
+
 export interface Student {
   id: string;
   name: string;

@@ -6,6 +6,7 @@ import {
   PreCouncilReport,
   Student,
   SchoolClass,
+  SchoolSubject,
   ConceptRating,
 } from '../types';
 import {
@@ -42,6 +43,7 @@ interface ReportFormProps {
   editingReport?: PreCouncilReport | null;
   students?: Student[];
   classes?: SchoolClass[];
+  subjects?: SchoolSubject[];
   onSaveReport: (report: PreCouncilReport) => void;
   onCancel?: () => void;
   onPreview?: (report: PreCouncilReport) => void;
@@ -55,6 +57,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   editingReport,
   students = [],
   classes = [],
+  subjects = [],
   onSaveReport,
   onCancel,
   onPreview,
@@ -387,7 +390,14 @@ export const ReportForm: React.FC<ReportFormProps> = ({
                 onChange={(e) => setComponent(e.target.value)}
                 className="w-full bg-white border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
               >
-                {AVAILABLE_SUBJECTS.map((sub) => (
+                {Array.from(
+                  new Set([
+                    ...(subjects.length > 0
+                      ? subjects.map((s) => s.name)
+                      : AVAILABLE_SUBJECTS),
+                    ...(component ? [component] : []),
+                  ])
+                ).map((sub) => (
                   <option key={sub} value={sub}>
                     {sub}
                   </option>

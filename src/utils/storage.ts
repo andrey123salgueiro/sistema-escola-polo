@@ -4,6 +4,7 @@ import {
   QuestionSection,
   PreCouncilReport,
   SchoolClass,
+  SchoolSubject,
   Student,
 } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -13,6 +14,7 @@ import {
   INITIAL_SECTIONS,
   INITIAL_REPORTS,
   INITIAL_CLASSES,
+  INITIAL_SUBJECTS,
   INITIAL_STUDENTS,
 } from '../data/initialData';
 
@@ -23,6 +25,7 @@ const SECTIONS_KEY = `pre_conselho_${DB_SCOPE}_sections`;
 const REPORTS_KEY = `pre_conselho_${DB_SCOPE}_reports`;
 const CURRENT_USER_KEY = `pre_conselho_${DB_SCOPE}_current_user`;
 const CLASSES_KEY = `pre_conselho_${DB_SCOPE}_classes`;
+const SUBJECTS_KEY = `pre_conselho_${DB_SCOPE}_subjects`;
 const STUDENTS_KEY = `pre_conselho_${DB_SCOPE}_students`;
 
 export function getStoredUsers(): User[] {
@@ -170,6 +173,24 @@ export function saveStoredStudents(students: Student[]) {
   localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
 }
 
+export function getStoredSubjects(): SchoolSubject[] {
+  try {
+    const raw = localStorage.getItem(SUBJECTS_KEY);
+    if (!raw) {
+      localStorage.setItem(SUBJECTS_KEY, JSON.stringify(INITIAL_SUBJECTS));
+      return INITIAL_SUBJECTS;
+    }
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to parse stored subjects', e);
+    return INITIAL_SUBJECTS;
+  }
+}
+
+export function saveStoredSubjects(subjects: SchoolSubject[]) {
+  localStorage.setItem(SUBJECTS_KEY, JSON.stringify(subjects));
+}
+
 export function getCurrentUser(): User | null {
   try {
     const raw = localStorage.getItem(CURRENT_USER_KEY);
@@ -197,6 +218,7 @@ export function resetToFactoryData() {
   localStorage.setItem(SECTIONS_KEY, JSON.stringify(INITIAL_SECTIONS));
   localStorage.setItem(REPORTS_KEY, JSON.stringify(INITIAL_REPORTS));
   localStorage.setItem(CLASSES_KEY, JSON.stringify(INITIAL_CLASSES));
+  localStorage.setItem(SUBJECTS_KEY, JSON.stringify(INITIAL_SUBJECTS));
   localStorage.setItem(STUDENTS_KEY, JSON.stringify(INITIAL_STUDENTS));
   localStorage.removeItem(CURRENT_USER_KEY);
 }

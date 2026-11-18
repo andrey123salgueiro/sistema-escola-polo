@@ -17,6 +17,7 @@ import {
   Cloud,
   CheckCircle2,
   UserCog,
+  BookOpen,
 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SCHOOL_NAME, SCHOOL_SUBTITLE } from '../data/initialData';
@@ -212,6 +213,19 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Layers className="w-3.5 h-3.5" />
                   <span>Turmas</span>
+                </button>
+
+                <button
+                  id="tab-diretora-subjects"
+                  onClick={() => onSelectTab('subjects')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                    activeTab === 'subjects'
+                      ? 'bg-slate-900 text-white font-semibold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Matérias</span>
                 </button>
 
                 <button

@@ -5,6 +5,7 @@ import {
   QuestionSection,
   PreCouncilReport,
   SchoolClass,
+  SchoolSubject,
   Student,
 } from './types';
 import {
@@ -18,6 +19,8 @@ import {
   saveStoredReports,
   getStoredClasses,
   saveStoredClasses,
+  getStoredSubjects,
+  saveStoredSubjects,
   getStoredStudents,
   saveStoredStudents,
   getCurrentUser,
@@ -30,6 +33,7 @@ import {
   subscribeSections,
   subscribeReports,
   subscribeClasses,
+  subscribeSubjects,
   subscribeStudents,
   saveUserDoc,
   batchSaveUsers,
@@ -42,6 +46,8 @@ import {
   deleteReportDoc,
   saveClassDoc,
   deleteClassDoc,
+  saveSubjectDoc,
+  deleteSubjectDoc,
   saveStudentDoc,
   batchSaveStudents,
   deleteStudentDoc,
@@ -53,6 +59,7 @@ import {
   INITIAL_SECTIONS,
   INITIAL_REPORTS,
   INITIAL_CLASSES,
+  INITIAL_SUBJECTS,
   INITIAL_STUDENTS,
   DEFAULT_SCHOOL_LOGO_URL,
 } from './data/initialData';
@@ -67,6 +74,7 @@ import { TeacherManagement } from './components/TeacherManagement';
 import { QuestionManagement } from './components/QuestionManagement';
 import { ReleaseReportManagement } from './components/ReleaseReportManagement';
 import { ClassManagement } from './components/ClassManagement';
+import { SubjectManagement } from './components/SubjectManagement';
 import { StudentManagement } from './components/StudentManagement';
 import { ClassPanorama } from './components/ClassPanorama';
 import { ClassPerformance } from './components/ClassPerformance';
@@ -85,6 +93,7 @@ export default function App() {
   const [sections, setSections] = useState<QuestionSection[]>([]);
   const [reports, setReports] = useState<PreCouncilReport[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [subjects, setSubjects] = useState<SchoolSubject[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(true);
 
@@ -142,6 +151,7 @@ export default function App() {
     const loadedSections = getStoredSections();
     const loadedReports = getStoredReports();
     const loadedClasses = getStoredClasses();
+    const loadedSubjects = getStoredSubjects();
     const loadedStudents = getStoredStudents();
     const activeUser = getCurrentUser();
 
@@ -150,6 +160,7 @@ export default function App() {
     setSections(loadedSections);
     setReports(loadedReports);
     setClasses(loadedClasses);
+    setSubjects(loadedSubjects);
     setStudents(loadedStudents);
     setCurrentUserState(activeUser);
 
@@ -206,6 +217,12 @@ export default function App() {
       setIsCloudSynced(true);
     });
 
+    const unsubSubjects = subscribeSubjects((cloudSubjects) => {
+      setSubjects(cloudSubjects);
+      saveStoredSubjects(cloudSubjects);
+      setIsCloudSynced(true);
+    });
+
     const unsubStudents = subscribeStudents((cloudStudents) => {
       setStudents(cloudStudents);
       saveStoredStudents(cloudStudents);
@@ -218,6 +235,7 @@ export default function App() {
       unsubSections();
       unsubReports();
       unsubClasses();
+      unsubSubjects();
       unsubStudents();
     };
   }, []);
@@ -254,6 +272,7 @@ export default function App() {
     setSections(INITIAL_SECTIONS);
     setReports(INITIAL_REPORTS);
     setClasses(INITIAL_CLASSES);
+    setSubjects(INITIAL_SUBJECTS);
     setStudents(INITIAL_STUDENTS);
     setCurrentUserState(null);
     setEditingReport(null);
@@ -266,6 +285,7 @@ export default function App() {
     for (const s of INITIAL_SECTIONS) await saveSectionDoc(s);
     for (const r of INITIAL_REPORTS) await saveReportDoc(r);
     for (const c of INITIAL_CLASSES) await saveClassDoc(c);
+    for (const sub of INITIAL_SUBJECTS) await saveSubjectDoc(sub);
     for (const st of INITIAL_STUDENTS) await saveStudentDoc(st);
 
     showToast('Dados restaurados para o padrão original da escola e sincronizados na nuvem!');
@@ -561,6 +581,56 @@ export default function App() {
     }
   };
 
+  // Subject Management actions
+  const handleAddSubject = async (newSubject: SchoolSubject) => {
+    setSubjects((prev) => {
+      const updated = [...prev, newSubject].sort((a, b) =>
+        a.name.localeCompare(b.name, 'pt-BR')
+      );
+      saveStoredSubjects(updated);
+      return updated;
+    });
+    try {
+      await saveSubjectDoc(newSubject);
+      showToast(`Matéria "${newSubject.name}" cadastrada e salva na nuvem!`);
+    } catch (err) {
+      console.error('Error saving subject to Firestore:', err);
+      showToast('Erro ao salvar matéria na nuvem. Verifique a conexão.');
+    }
+  };
+
+  const handleUpdateSubject = async (updatedSubject: SchoolSubject) => {
+    setSubjects((prev) => {
+      const updated = prev
+        .map((s) => (s.id === updatedSubject.id ? updatedSubject : s))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      saveStoredSubjects(updated);
+      return updated;
+    });
+    try {
+      await saveSubjectDoc(updatedSubject);
+      showToast('Matéria atualizada com sucesso.');
+    } catch (err) {
+      console.error('Error updating subject in Firestore:', err);
+      showToast('Erro ao atualizar matéria na nuvem. Verifique a conexão.');
+    }
+  };
+
+  const handleDeleteSubject = async (subjectId: string) => {
+    setSubjects((prev) => {
+      const updated = prev.filter((s) => s.id !== subjectId);
+      saveStoredSubjects(updated);
+      return updated;
+    });
+    try {
+      await deleteSubjectDoc(subjectId);
+      showToast('Matéria excluída com sucesso.');
+    } catch (err) {
+      console.error('Error deleting subject in Firestore:', err);
+      showToast('Erro ao excluir matéria na nuvem. Verifique a conexão.');
+    }
+  };
+
   // Student Management actions
   const handleAddStudent = async (newStudent: Student) => {
     setStudents((prev) => {
@@ -763,6 +833,16 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'subjects' && (
+              <SubjectManagement
+                subjects={subjects}
+                teachers={onlyTeachers}
+                onAddSubject={handleAddSubject}
+                onUpdateSubject={handleUpdateSubject}
+                onDeleteSubject={handleDeleteSubject}
+              />
+            )}
+
             {activeTab === 'release' && (
               <ReleaseReportManagement
                 teachers={onlyTeachers}
@@ -778,10 +858,12 @@ export default function App() {
               <TeacherManagement
                 teachers={onlyTeachers}
                 classes={classes}
+                subjects={subjects}
                 onAddTeacher={handleAddTeacher}
                 onAddMultipleTeachers={handleAddMultipleTeachers}
                 onUpdateTeacher={handleUpdateTeacher}
                 onDeleteTeacher={handleDeleteTeacher}
+                onAddSubject={handleAddSubject}
               />
             )}
 
@@ -839,6 +921,7 @@ export default function App() {
                   sections={sections}
                   students={students}
                   classes={classes}
+                  subjects={subjects}
                   existingReport={editingReport}
                   editingReport={editingReport}
                   onSaveReport={handleSaveReport}

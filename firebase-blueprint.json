@@ -100,6 +100,18 @@
         "active": { "type": "boolean", "description": "Aluno ativo" }
       },
       "required": ["id", "name", "classGroup"]
+    },
+    "SchoolSubject": {
+      "title": "SchoolSubject",
+      "description": "Matéria ou componente curricular cadastrado pela direção",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID da matéria" },
+        "name": { "type": "string", "description": "Nome da matéria ou componente curricular" },
+        "area": { "type": "string", "description": "Área do conhecimento (opcional)" },
+        "createdAt": { "type": "string", "description": "Data de cadastro" }
+      },
+      "required": ["id", "name"]
     }
   },
   "firestore": {
@@ -126,6 +138,10 @@
     "/students/{studentId}": {
       "schema": { "$ref": "#/entities/Student" },
       "description": "Alunos cadastrados ou importados via Excel"
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/SchoolSubject" },
+      "description": "Matérias e componentes curriculares cadastrados pela direção"
     }
   }
 }

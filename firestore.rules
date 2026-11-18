@@ -47,5 +47,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isValidId(studentId);
     }
+
+    // Subjects / Matérias
+    match /subjects/{subjectId} {
+      allow read: if true;
+      allow write: if isValidId(subjectId);
+    }
   }
 }

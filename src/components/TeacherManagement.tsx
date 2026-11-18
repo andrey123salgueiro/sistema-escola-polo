@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { User, SchoolClass } from '../types';
+import { User, SchoolClass, SchoolSubject } from '../types';
 import * as XLSX from 'xlsx';
 import {
   AVAILABLE_CLASSES,
@@ -23,16 +23,19 @@ import {
   AlertCircle,
   Check,
   X,
+  PlusCircle,
 } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
 
 interface TeacherManagementProps {
   teachers: User[];
   classes?: SchoolClass[];
+  subjects?: SchoolSubject[];
   onAddTeacher: (newTeacher: User) => void;
   onAddMultipleTeachers?: (newTeachers: User[]) => void;
   onUpdateTeacher: (teacher: User) => void;
   onDeleteTeacher: (teacherId: string) => void;
+  onAddSubject?: (newSubject: SchoolSubject) => void;
 }
 
 interface ImportedTeacherPreview {
@@ -98,22 +101,35 @@ function parseClassList(rawValue: string, availableClassNames: string[]): string
   return Array.from(new Set(parts));
 }
 
-function matchSubjectName(rawSubject: string): string {
+function matchSubjectName(
+  rawSubject: string,
+  availableSubjectNames: string[]
+): string {
   const trimmed = rawSubject.trim();
   if (!trimmed) return '';
 
   const normRaw = normalizeText(trimmed);
-  const exact = AVAILABLE_SUBJECTS.find((s) => normalizeText(s) === normRaw);
+  const exact = availableSubjectNames.find((s) => normalizeText(s) === normRaw);
   if (exact) return exact;
 
   if (normRaw === 'portugues' || normRaw === 'lingua portuguesa') {
-    return 'Língua Portuguesa';
+    return (
+      availableSubjectNames.find((s) => normalizeText(s) === 'lingua portuguesa') ||
+      'Língua Portuguesa'
+    );
   }
   if (normRaw === 'ingles' || normRaw === 'lingua inglesa') {
-    return 'Língua Inglesa';
+    return (
+      availableSubjectNames.find((s) => normalizeText(s) === 'lingua inglesa') ||
+      'Língua Inglesa'
+    );
   }
   if (normRaw === 'ciencias' || normRaw === 'ciencias da natureza') {
-    return 'Ciências da Natureza';
+    return (
+      availableSubjectNames.find(
+        (s) => normalizeText(s) === 'ciencias da natureza'
+      ) || 'Ciências da Natureza'
+    );
   }
 
   return trimmed;
@@ -122,22 +138,30 @@ function matchSubjectName(rawSubject: string): string {
 export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   teachers,
   classes,
+  subjects,
   onAddTeacher,
   onAddMultipleTeachers,
   onUpdateTeacher,
   onDeleteTeacher,
+  onAddSubject,
 }) => {
   const availableClassNames =
     classes && classes.length > 0 ? classes.map((c) => c.name) : AVAILABLE_CLASSES;
+  const availableSubjectNames =
+    subjects && subjects.length > 0
+      ? subjects.map((s) => s.name)
+      : AVAILABLE_SUBJECTS;
   const [showForm, setShowForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
+  const [showQuickSubject, setShowQuickSubject] = useState(false);
+  const [quickSubjectName, setQuickSubjectName] = useState('');
 
   // Form states
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('123');
-  const [subject, setSubject] = useState(AVAILABLE_SUBJECTS[0]);
+  const [subject, setSubject] = useState(availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([
     availableClassNames[0] || '6º Ano A',
   ]);
@@ -157,9 +181,11 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     setName('');
     setEmail('');
     setPassword('123');
-    setSubject(AVAILABLE_SUBJECTS[0]);
+    setSubject(availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]);
     setSelectedClasses([availableClassNames[0] || '6º Ano A']);
     setEditingTeacherId(null);
+    setShowQuickSubject(false);
+    setQuickSubjectName('');
     setShowForm(false);
   };
 
@@ -364,7 +390,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           const parsedClasses = parseClassList(rawClass, availableClassNames);
           const parsedSubjects = rawSubject
             .split(/[,;|\n]+/)
-            .map((s) => matchSubjectName(s))
+            .map((s) => matchSubjectName(s, availableSubjectNames))
             .filter(Boolean);
 
           const existingEntry = grouped.get(normName);
@@ -409,7 +435,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
             const mergedSubject =
               entry.subjects.length > 0
                 ? entry.subjects.join(', ')
-                : existingTeacher?.subject || AVAILABLE_SUBJECTS[0];
+                : existingTeacher?.subject || availableSubjectNames[0] || AVAILABLE_SUBJECTS[0];
 
             return {
               existingId: existingTeacher?.id,
@@ -567,9 +593,31 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   });
 
   // Ensure subject select always shows current custom subject if imported
-  const subjectOptions = AVAILABLE_SUBJECTS.includes(subject)
-    ? AVAILABLE_SUBJECTS
-    : [subject, ...AVAILABLE_SUBJECTS];
+  const subjectOptions = availableSubjectNames.includes(subject)
+    ? availableSubjectNames
+    : [subject, ...availableSubjectNames];
+
+  const handleQuickAddSubject = () => {
+    const clean = quickSubjectName.trim();
+    if (!clean || !onAddSubject) return;
+    const exists = availableSubjectNames.find(
+      (s) => normalizeText(s) === normalizeText(clean)
+    );
+    if (exists) {
+      setSubject(exists);
+      setQuickSubjectName('');
+      setShowQuickSubject(false);
+      return;
+    }
+    onAddSubject({
+      id: `sub-${Date.now()}`,
+      name: clean,
+      createdAt: new Date().toISOString().split('T')[0],
+    });
+    setSubject(clean);
+    setQuickSubjectName('');
+    setShowQuickSubject(false);
+  };
 
   // Ensure class checkboxes include any extra imported classes
   const allClassOptions = Array.from(
@@ -713,9 +761,47 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
             {/* Disciplina */}
             <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
-                Componente Curricular / Matéria Principal
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-stone-700">
+                  Componente Curricular / Matéria Principal
+                </label>
+                {onAddSubject && (
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickSubject((v) => !v)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 hover:text-amber-900 cursor-pointer"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>{showQuickSubject ? 'Fechar' : '+ Nova Matéria'}</span>
+                  </button>
+                )}
+              </div>
+
+              {showQuickSubject && onAddSubject && (
+                <div className="mb-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl p-2">
+                  <input
+                    type="text"
+                    placeholder="Digite o nome da nova matéria (ex: Física, Sociologia...)"
+                    value={quickSubjectName}
+                    onChange={(e) => setQuickSubjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleQuickAddSubject();
+                      }
+                    }}
+                    className="flex-1 bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleQuickAddSubject}
+                    className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-lg cursor-pointer"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              )}
+
               <select
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
