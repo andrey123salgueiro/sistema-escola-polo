@@ -69,7 +69,10 @@ import { ClassPanorama } from './components/ClassPanorama';
 import { ClassPerformance } from './components/ClassPerformance';
 import { ReportViewModal } from './components/ReportViewModal';
 import { AdminProfileModal } from './components/AdminProfileModal';
-import { AdminTeamManagement } from './components/AdminTeamManagement';
+import {
+  AdminTeamManagement,
+  isGeneralDirector,
+} from './components/AdminTeamManagement';
 import { CheckCircle2 } from 'lucide-react';
 
 import firebaseConfig from '../firebase-applet-config.json';
@@ -441,6 +444,13 @@ export default function App() {
   };
 
   const handleUpdateAdminUser = async (updatedAdmin: User) => {
+    if (!isGeneralDirector(currentUser) && updatedAdmin.id !== currentUser?.id) {
+      showToast(
+        'Somente a Direção Geral (Ana Paula) pode editar dados e senhas de outros integrantes.'
+      );
+      return;
+    }
+
     setUsers((prev) => {
       const updated = prev.map((u) => (u.id === updatedAdmin.id ? updatedAdmin : u));
       saveStoredUsers(updated);
@@ -455,6 +465,15 @@ export default function App() {
   };
 
   const handleDeleteAdminUser = async (adminId: string) => {
+    if (!isGeneralDirector(currentUser)) {
+      showToast('Somente a Direção Geral (Ana Paula) pode excluir membros da equipe.');
+      return;
+    }
+    if (adminId === currentUser?.id || adminId === 'user-diretora') {
+      showToast('Não é possível excluir a Direção Geral ou o usuário conectado.');
+      return;
+    }
+
     setUsers((prev) => {
       const updated = prev.filter((u) => u.id !== adminId);
       saveStoredUsers(updated);

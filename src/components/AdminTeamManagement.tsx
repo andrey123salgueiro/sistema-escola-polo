@@ -63,6 +63,12 @@ function suggestEmail(fullName: string): string {
   return `${slug || 'equipe'}@escola.gov.br`;
 }
 
+export function isGeneralDirector(user?: User | null): boolean {
+  if (!user || user.role !== 'diretora') return false;
+  if (user.id === 'user-diretora') return true;
+  return normalizeText(user.username || '') === 'admin';
+}
+
 export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
   adminUsers,
   allUsers,
@@ -94,6 +100,8 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
 
   const formRef = useRef<HTMLDivElement | null>(null);
 
+  const isMainDirector = isGeneralDirector(currentUser);
+
   const resetForm = () => {
     setName('');
     setPosition('Pedagogo(a)');
@@ -121,6 +129,14 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
   };
 
   const handleStartEdit = (member: User) => {
+    if (!isMainDirector && member.id !== currentUser.id) {
+      setFeedbackMsg(
+        'Somente a Direção Geral (Ana Paula) pode editar dados ou senhas de outros integrantes.'
+      );
+      setTimeout(() => setFeedbackMsg(null), 4000);
+      return;
+    }
+
     setEditingAdminId(member.id);
     setName(member.name);
     setPosition(member.position || 'Direção / Equipe Gestora');
@@ -189,6 +205,13 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
     }
 
     if (editingAdminId) {
+      if (!isMainDirector && editingAdminId !== currentUser.id) {
+        setFormError(
+          'Somente a Direção Geral (Ana Paula) pode alterar os dados ou a senha de outro membro.'
+        );
+        return;
+      }
+
       const existing = adminUsers.find((u) => u.id === editingAdminId);
       const updatedUser: User = {
         ...(existing || {
@@ -292,11 +315,14 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
           <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="font-semibold">
-              Cada integrante entra na aba &ldquo;Acesso Administrativo&rdquo; com seu próprio usuário e senha.
+              {isMainDirector
+                ? 'Acesso da Direção Geral ativo: você pode gerenciar acessos, senhas e exclusões de toda a equipe.'
+                : 'Permissões da Equipe Administrativa: você pode editar seus próprios dados e senha.'}
             </p>
             <p className="text-[11px] text-amber-900/85">
-              Confira os nomes cadastrados abaixo (incluindo eventuais ajustes de grafia) e clique em{' '}
-              <strong>Cadastrar Membro da Equipe</strong> para incluir a 8ª integrante da equipe pedagógica caso falte alguém.
+              {isMainDirector
+                ? 'Cada integrante entra na aba "Acesso Administrativo" com seu próprio usuário e senha. Apenas a Direção Geral pode editar senhas de outros membros ou remover acessos.'
+                : 'Somente a Direção Geral (Ana Paula) possui permissão para visualizar ou alterar senhas de outros integrantes e excluir acessos.'}
             </p>
           </div>
         </div>
@@ -521,9 +547,16 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredAdmins.map((member) => {
                 const isSelf = member.id === currentUser.id;
-                const isPasswordVisible = Boolean(revealedPasswords[member.id]);
+                const canViewPassword = isMainDirector || isSelf;
+                const canEditMember = isMainDirector || isSelf;
+                const canDelete =
+                  isMainDirector &&
+                  !isSelf &&
+                  member.id !== 'user-diretora' &&
+                  adminUsers.length > 1;
+                const isPasswordVisible =
+                  canViewPassword && Boolean(revealedPasswords[member.id]);
                 const displayPassword = member.password || '123';
-                const canDelete = !isSelf && adminUsers.length > 1;
 
                 return (
                   <tr
@@ -574,18 +607,27 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
                         <code className="px-2 py-1 rounded-md bg-slate-50 text-slate-800 font-mono text-[11px] border border-slate-200 min-w-[64px] text-center">
                           {isPasswordVisible ? displayPassword : '••••••'}
                         </code>
-                        <button
-                          type="button"
-                          onClick={() => toggleRevealPassword(member.id)}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title={isPasswordVisible ? 'Ocultar senha' : 'Mostrar senha'}
-                        >
-                          {isPasswordVisible ? (
-                            <EyeOff className="w-3.5 h-3.5" />
-                          ) : (
-                            <Eye className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                        {canViewPassword ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleRevealPassword(member.id)}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title={isPasswordVisible ? 'Ocultar senha' : 'Mostrar senha'}
+                          >
+                            {isPasswordVisible ? (
+                              <EyeOff className="w-3.5 h-3.5" />
+                            ) : (
+                              <Eye className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        ) : (
+                          <span
+                            className="p-1.5 text-slate-300"
+                            title="Senha protegida — apenas a Direção Geral (Ana Paula) pode visualizar"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -593,9 +635,18 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
                       <div className="inline-flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleStartEdit(member)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                          title="Editar dados e senha"
+                          disabled={!canEditMember}
+                          onClick={() => canEditMember && handleStartEdit(member)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg border transition-colors ${
+                            canEditMember
+                              ? 'text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border-slate-200 cursor-pointer'
+                              : 'text-slate-300 bg-slate-50 border-slate-100 cursor-not-allowed'
+                          }`}
+                          title={
+                            canEditMember
+                              ? 'Editar dados e senha'
+                              : 'Somente a Direção Geral (Ana Paula) pode editar dados e senhas de outros membros'
+                          }
                         >
                           <Edit className="w-3.5 h-3.5" />
                           <span>Editar</span>
@@ -611,8 +662,12 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
                               : 'text-slate-300 bg-slate-50 border-slate-100 cursor-not-allowed'
                           }`}
                           title={
-                            isSelf
+                            !isMainDirector
+                              ? 'Somente a Direção Geral (Ana Paula) pode excluir membros'
+                              : isSelf
                               ? 'Você não pode excluir o próprio usuário conectado'
+                              : member.id === 'user-diretora'
+                              ? 'A conta principal da Direção Geral não pode ser excluída'
                               : adminUsers.length <= 1
                               ? 'Deve existir ao menos um administrador'
                               : 'Excluir acesso'
