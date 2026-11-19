@@ -212,14 +212,29 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({
           <select
             value={selectedTeacher}
             onChange={(e) => setSelectedTeacher(e.target.value)}
-            className="bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-800 focus:ring-2 focus:ring-amber-500"
+            className="w-full md:w-52 lg:w-56 max-w-full truncate bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-800 focus:ring-2 focus:ring-amber-500"
           >
             <option value="all">Todos os Professores</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.subject || 'Docente'})
-              </option>
-            ))}
+            {teachers.map((t) => {
+              const subList =
+                t.subjects && t.subjects.length > 0
+                  ? t.subjects
+                  : t.subject
+                    ? t.subject
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                    : [];
+              const subSummary =
+                subList.length > 1
+                  ? `${subList[0]} +${subList.length - 1}`
+                  : subList[0] || 'Docente';
+              return (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({subSummary})
+                </option>
+              );
+            })}
           </select>
 
           {/* Trimestre Filter */}

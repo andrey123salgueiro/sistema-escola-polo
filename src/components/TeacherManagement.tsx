@@ -313,7 +313,10 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
 
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: '',
+        });
 
         if (rawRows.length < 2) {
           setImportError('A planilha parece vazia ou sem linhas de dados.');
@@ -323,9 +326,9 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         // Find header row within the first 5 non-empty rows
         let headerRowIdx = 0;
         for (let r = 0; r < Math.min(rawRows.length, 5); r++) {
-          const rowText = (rawRows[r] || [])
-            .map((cell) => normalizeText(String(cell || '')))
-            .join(' ');
+          const rowText = Array.from(rawRows[r] || [], (cell) =>
+            normalizeText(String(cell ?? ''))
+          ).join(' ');
           if (
             rowText.includes('nome') ||
             rowText.includes('professor') ||
@@ -339,8 +342,9 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           }
         }
 
-        const headers: string[] = (rawRows[headerRowIdx] || []).map((h: any) =>
-          normalizeText(String(h || ''))
+        const headers: string[] = Array.from(
+          rawRows[headerRowIdx] || [],
+          (h: any) => normalizeText(String(h ?? ''))
         );
 
         let nameIdx = headers.findIndex(

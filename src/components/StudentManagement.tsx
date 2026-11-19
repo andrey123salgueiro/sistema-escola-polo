@@ -159,29 +159,77 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
   // Handle Excel / CSV File Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImportError(null);
+    setImportedPreview([]);
     const file = e.target.files?.[0];
     if (!file) return;
 
     setImportFileName(file.name);
 
+    const normalizeCell = (value: unknown): string =>
+      String(value ?? '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const buffer = evt.target?.result;
+        if (!buffer) {
+          setImportError('Não foi possível ler o arquivo selecionado.');
+          return;
+        }
+
+        const workbook = XLSX.read(new Uint8Array(buffer as ArrayBuffer), {
+          type: 'array',
+        });
 
         const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (!firstSheetName) {
+          setImportError('A planilha não possui abas legíveis.');
+          return;
+        }
 
-        if (rawJson.length < 2) {
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawJson: unknown[][] = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: '',
+        });
+
+        if (rawJson.length === 0) {
           setImportError('A planilha parece vazia ou sem linhas de dados.');
           return;
         }
 
-        // Find header row
-        const headers: string[] = rawJson[0].map((h: any) =>
-          String(h || '').trim().toLowerCase()
+        // Locate the header row among the first rows (supports school exports with title banners)
+        let headerRowIdx = 0;
+        let foundExplicitHeader = false;
+        for (let r = 0; r < Math.min(rawJson.length, 15); r++) {
+          const cells = Array.from(rawJson[r] || [], (cell) => normalizeCell(cell));
+          const hasHeaderKeyword = cells.some(
+            (c) =>
+              c.includes('nome') ||
+              c.includes('aluno') ||
+              c.includes('estudante') ||
+              c === 'name' ||
+              c.includes('chamada') ||
+              c.includes('matricula') ||
+              c.includes('turma') ||
+              c.includes('classe') ||
+              c.includes('serie')
+          );
+          if (hasHeaderKeyword) {
+            headerRowIdx = r;
+            foundExplicitHeader = true;
+            break;
+          }
+        }
+
+        const headers: string[] = Array.from(
+          rawJson[headerRowIdx] || [],
+          (h) => normalizeCell(h)
         );
 
         let nameIdx = headers.findIndex(
@@ -191,22 +239,25 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
             h.includes('estudante') ||
             h === 'name'
         );
-        let rollIdx = headers.findIndex(
+        const rollIdx = headers.findIndex(
           (h) =>
             h.includes('num') ||
             h.includes('nº') ||
+            h.includes('no ') ||
+            h === 'no' ||
+            h === 'n' ||
             h.includes('chamada') ||
             h.includes('matricula') ||
-            h.includes('matrícula')
+            h.includes('cgm') ||
+            h.includes('ra')
         );
-        let classIdx = headers.findIndex(
+        const classIdx = headers.findIndex(
           (h) =>
             h.includes('turma') ||
             h.includes('classe') ||
-            h.includes('serie') ||
-            h.includes('série')
+            h.includes('serie')
         );
-        let obsIdx = headers.findIndex(
+        const obsIdx = headers.findIndex(
           (h) =>
             h.includes('obs') ||
             h.includes('observ') ||
@@ -214,9 +265,10 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
             h.includes('situacao')
         );
 
-        // Fallback: if header name index wasn't identified by column names, check first column
+        // Fallback: first non-empty column if name column wasn't explicitly named
         if (nameIdx === -1) {
-          nameIdx = 0; // Assume 1st column is name if not named
+          const firstNonEmptyCol = headers.findIndex((h) => h !== '');
+          nameIdx = firstNonEmptyCol >= 0 ? firstNonEmptyCol : 0;
         }
 
         const parsedList: {
@@ -226,19 +278,30 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
           notes?: string;
         }[] = [];
 
-        for (let i = 1; i < rawJson.length; i++) {
-          const row = rawJson[i];
-          if (!row || row.length === 0) continue;
+        const startRow = foundExplicitHeader ? headerRowIdx + 1 : 0;
 
-          const rawName = row[nameIdx] ? String(row[nameIdx]).trim() : '';
+        for (let i = startRow; i < rawJson.length; i++) {
+          const row = Array.from(rawJson[i] || []);
+          if (row.length === 0) continue;
+
+          const rawName =
+            row[nameIdx] !== undefined && row[nameIdx] !== null
+              ? String(row[nameIdx]).trim()
+              : '';
           if (!rawName) continue;
 
           const rawRoll =
-            rollIdx >= 0 && row[rollIdx] ? String(row[rollIdx]).trim() : '';
+            rollIdx >= 0 && row[rollIdx] !== undefined && row[rollIdx] !== null
+              ? String(row[rollIdx]).trim()
+              : '';
           const rawClass =
-            classIdx >= 0 && row[classIdx] ? String(row[classIdx]).trim() : '';
+            classIdx >= 0 && row[classIdx] !== undefined && row[classIdx] !== null
+              ? String(row[classIdx]).trim()
+              : '';
           const rawObs =
-            obsIdx >= 0 && row[obsIdx] ? String(row[obsIdx]).trim() : '';
+            obsIdx >= 0 && row[obsIdx] !== undefined && row[obsIdx] !== null
+              ? String(row[obsIdx]).trim()
+              : '';
 
           parsedList.push({
             name: rawName,
@@ -262,7 +325,7 @@ export const StudentManagement: React.FC<StudentManagementProps> = ({
       }
     };
 
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleConfirmImport = () => {
