@@ -25,7 +25,6 @@ import {
   saveStoredStudents,
   getCurrentUser,
   setCurrentUser as persistCurrentUser,
-  resetToFactoryData,
 } from './utils/storage';
 import {
   subscribeUsers,
@@ -51,18 +50,8 @@ import {
   saveStudentDoc,
   batchSaveStudents,
   deleteStudentDoc,
-  markAllCollectionsSeeded,
 } from './firebase';
-import {
-  INITIAL_USERS,
-  INITIAL_QUESTIONS,
-  INITIAL_SECTIONS,
-  INITIAL_REPORTS,
-  INITIAL_CLASSES,
-  INITIAL_SUBJECTS,
-  INITIAL_STUDENTS,
-  DEFAULT_SCHOOL_LOGO_URL,
-} from './data/initialData';
+import { DEFAULT_SCHOOL_LOGO_URL } from './data/initialData';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ContactModal } from './components/ContactModal';
@@ -96,7 +85,6 @@ export default function App() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<SchoolSubject[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [isCloudSynced, setIsCloudSynced] = useState<boolean>(true);
 
   // School crest / logo state (official school crest)
   const [schoolLogoUrl, setSchoolLogoUrlState] = useState<string>(() => {
@@ -191,43 +179,36 @@ export default function App() {
         }
         return prev;
       });
-      setIsCloudSynced(true);
     });
 
     const unsubQuestions = subscribeQuestions((cloudQuestions) => {
       setQuestions(cloudQuestions);
       saveStoredQuestions(cloudQuestions);
-      setIsCloudSynced(true);
     });
 
     const unsubSections = subscribeSections((cloudSections) => {
       setSections(cloudSections);
       saveStoredSections(cloudSections);
-      setIsCloudSynced(true);
     });
 
     const unsubReports = subscribeReports((cloudReports) => {
       setReports(cloudReports);
       saveStoredReports(cloudReports);
-      setIsCloudSynced(true);
     });
 
     const unsubClasses = subscribeClasses((cloudClasses) => {
       setClasses(cloudClasses);
       saveStoredClasses(cloudClasses);
-      setIsCloudSynced(true);
     });
 
     const unsubSubjects = subscribeSubjects((cloudSubjects) => {
       setSubjects(cloudSubjects);
       saveStoredSubjects(cloudSubjects);
-      setIsCloudSynced(true);
     });
 
     const unsubStudents = subscribeStudents((cloudStudents) => {
       setStudents(cloudStudents);
       saveStoredStudents(cloudStudents);
-      setIsCloudSynced(true);
     });
 
     return () => {
@@ -264,33 +245,6 @@ export default function App() {
     setEditingReport(null);
     setViewingReport(null);
     showToast('Você saiu com segurança. Faça login para acessar novamente.');
-  };
-
-  // Reset to default factory data and reseed Firestore
-  const handleResetData = async () => {
-    resetToFactoryData();
-    setUsers(INITIAL_USERS);
-    setQuestions(INITIAL_QUESTIONS);
-    setSections(INITIAL_SECTIONS);
-    setReports(INITIAL_REPORTS);
-    setClasses(INITIAL_CLASSES);
-    setSubjects(INITIAL_SUBJECTS);
-    setStudents(INITIAL_STUDENTS);
-    setCurrentUserState(null);
-    setEditingReport(null);
-    setViewingReport(null);
-
-    // Reseed cloud database
-    await markAllCollectionsSeeded();
-    for (const u of INITIAL_USERS) await saveUserDoc(u);
-    for (const q of INITIAL_QUESTIONS) await saveQuestionDoc(q);
-    for (const s of INITIAL_SECTIONS) await saveSectionDoc(s);
-    for (const r of INITIAL_REPORTS) await saveReportDoc(r);
-    for (const c of INITIAL_CLASSES) await saveClassDoc(c);
-    for (const sub of INITIAL_SUBJECTS) await saveSubjectDoc(sub);
-    for (const st of INITIAL_STUDENTS) await saveStudentDoc(st);
-
-    showToast('Dados restaurados para o padrão original da escola e sincronizados na nuvem!');
   };
 
   // Save or submit report (Syncs instantly to Firestore)
@@ -793,9 +747,7 @@ export default function App() {
       <Header
         currentUser={currentUser}
         activeTab={activeTab}
-        isCloudSynced={isCloudSynced}
         schoolLogoUrl={schoolLogoUrl}
-        onOpenContact={() => setIsContactModalOpen(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onSelectTab={(tab) => {
           setActiveTab(tab);
@@ -805,7 +757,6 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onLogout={handleLogout}
-        onResetData={handleResetData}
       />
 
       {/* Main Content Body */}

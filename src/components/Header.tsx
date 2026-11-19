@@ -7,31 +7,23 @@ import {
   HelpCircle,
   LogOut,
   Archive,
-  RefreshCw,
   Send,
   Edit3,
   TrendingUp,
   Layers,
   FileSpreadsheet,
   Eye,
-  Cloud,
-  CheckCircle2,
   UserCog,
   BookOpen,
   ShieldCheck,
 } from 'lucide-react';
-import { ConfirmDialog } from './ConfirmDialog';
-import { SCHOOL_NAME, SCHOOL_SUBTITLE } from '../data/initialData';
 
 interface HeaderProps {
   currentUser: User;
   activeTab: string;
   onSelectTab: (tab: string) => void;
   onLogout: () => void;
-  onResetData: () => void;
-  isCloudSynced?: boolean;
   schoolLogoUrl?: string;
-  onOpenContact?: () => void;
   onOpenProfile?: () => void;
 }
 
@@ -40,79 +32,13 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onSelectTab,
   onLogout,
-  onResetData,
-  isCloudSynced = true,
   schoolLogoUrl,
-  onOpenContact,
   onOpenProfile,
 }) => {
   const isDiretora = currentUser.role === 'diretora';
-  const [showResetConfirm, setShowResetConfirm] = React.useState(false);
 
   return (
     <header className="bg-white border-b border-slate-200/90 sticky top-0 z-40 shadow-xs">
-      {/* Top Institutional Ribbon */}
-      <div className="bg-slate-950 text-slate-300 px-4 py-1.5 text-xs font-sans border-b border-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-          {/* Institutional Breadcrumb */}
-          <div className="flex items-center gap-2 text-[11px] tracking-wide">
-            <span className="font-bold text-white uppercase">
-              {SCHOOL_NAME}
-            </span>
-            <span className="text-slate-600 hidden sm:inline" aria-hidden="true">/</span>
-            <span className="text-slate-400 hidden sm:inline font-medium">
-              {SCHOOL_SUBTITLE}
-            </span>
-          </div>
-
-          {/* System Telemetry & Utilities */}
-          <div className="flex items-center gap-3 text-[11px]">
-            <div
-              className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium border ${
-                isCloudSynced
-                  ? 'bg-slate-900 border-emerald-500/30 text-emerald-300'
-                  : 'bg-slate-900 border-amber-500/30 text-amber-300'
-              }`}
-              title={
-                isCloudSynced
-                  ? 'Sincronização em nuvem ativa em tempo real'
-                  : 'Conectando ao banco de dados...'
-              }
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isCloudSynced ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                }`}
-              />
-              <span className="font-mono text-[10px] tracking-tight">
-                {isCloudSynced ? 'Nuvem Conectada' : 'Sincronizando'}
-              </span>
-            </div>
-
-            {onOpenContact && (
-              <button
-                type="button"
-                onClick={onOpenContact}
-                title="Abrir canal de Fale Conosco"
-                className="text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors text-[11px] font-semibold"
-              >
-                <span>Fale Conosco</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowResetConfirm(true)}
-              title="Restaurar dados padrão"
-              className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors text-[11px] cursor-pointer"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span>Restaurar Padrão</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Bar: Logo, Navigation Tabs, and User Action */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -389,21 +315,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Confirmation Modal for Resetting Initial Data */}
-      <ConfirmDialog
-        isOpen={showResetConfirm}
-        title="Restaurar Dados Padrão"
-        message="Deseja restaurar as perguntas e professores para os dados iniciais padrão do sistema escolar? Alterações locais serão redefinidas."
-        confirmText="Sim, Restaurar Padrão"
-        cancelText="Cancelar"
-        variant="warning"
-        onConfirm={() => {
-          onResetData();
-          setShowResetConfirm(false);
-        }}
-        onCancel={() => setShowResetConfirm(false)}
-      />
     </header>
   );
 };
