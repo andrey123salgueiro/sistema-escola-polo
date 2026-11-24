@@ -291,6 +291,21 @@ export default function App() {
     showToast('Ficha de pré-conselho excluída com sucesso da nuvem.');
   };
 
+  const handleDeleteMultipleReports = async (reportIds: string[]) => {
+    if (reportIds.length === 0) return;
+    const idSet = new Set(reportIds);
+    const updated = reports.filter((r) => !idSet.has(r.id));
+    setReports(updated);
+    saveStoredReports(updated);
+    if (viewingReport && idSet.has(viewingReport.id)) setViewingReport(null);
+    if (editingReport && idSet.has(editingReport.id)) setEditingReport(null);
+
+    for (const id of reportIds) {
+      await deleteReportDoc(id);
+    }
+    showToast(`${reportIds.length} fichas removidas com sucesso da nuvem.`);
+  };
+
   // Quick Sign by Director
   const handleQuickSign = async (
     reportId: string,
@@ -796,6 +811,7 @@ export default function App() {
                   setViewingReport(rep);
                 }}
                 onDeleteReport={handleDeleteReport}
+                onDeleteMultipleReports={handleDeleteMultipleReports}
                 onQuickSign={handleQuickSign}
               />
             )}

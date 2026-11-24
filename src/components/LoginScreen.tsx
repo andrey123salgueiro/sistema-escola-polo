@@ -76,7 +76,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
 
     if (!cleanPass) {
-      setErrorMessage('Por favor, digite a sua senha de acesso (padrão: 123).');
+      setErrorMessage('Por favor, digite a sua senha de acesso.');
       return;
     }
 
@@ -129,10 +129,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    // All teachers have password 123
     const expectedPass = foundTeacher.password || '123';
-    if (cleanPass !== '123' && cleanPass !== expectedPass) {
-      setErrorMessage('Senha incorreta. A senha padrão de todos os professores é 123.');
+    if (cleanPass !== expectedPass) {
+      setErrorMessage('Senha incorreta. Verifique sua senha ou consulte a Direção.');
       return;
     }
 
@@ -295,18 +294,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {/* TAB 1: PROFESSOR LOGIN */}
             {activeTab === 'professor' && (
               <div>
-                <div className="mb-5 pb-3 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Portal do Docente
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Preenchimento das fichas pedagógicas
-                    </p>
-                  </div>
-                  <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                    Senha: 123
-                  </span>
+                <div className="mb-5 pb-3 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Portal do Docente
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Preenchimento das fichas pedagógicas
+                  </p>
                 </div>
 
                 <form onSubmit={handleTeacherSubmit} className="space-y-4">
@@ -334,21 +328,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                   {/* Password */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-medium text-slate-700">
-                        Senha de Acesso
-                      </label>
-                      <span className="text-[10px] text-slate-400">
-                        Padrão: 123
-                      </span>
-                    </div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Senha de Acesso
+                    </label>
                     <div className="relative">
                       <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type={showTeacherPassword ? 'text' : 'password'}
                         required
                         id="input-teacher-password"
-                        placeholder="Senha (123)"
+                        placeholder="Digite sua senha"
                         value={teacherPassword}
                         onChange={(e) => setTeacherPassword(e.target.value)}
                         className="w-full pl-9 pr-10 py-2.5 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-mono"
@@ -406,7 +395,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     <span>Login individual por membro da equipe:</span>
                   </div>
                   <p className="text-[11px] text-slate-600 ml-5">
-                    Informe seu <strong>usuário</strong> (ou nome/e-mail) e sua <strong>senha pessoal</strong>. A senha inicial padrão é <span className="font-mono font-semibold">123</span>.
+                    Informe seu <strong>usuário</strong> (ou nome/e-mail) e sua <strong>senha pessoal</strong>.
                   </p>
                 </div>
 
