@@ -29,6 +29,8 @@ interface LoginScreenProps {
   onOpenContact?: () => void;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function normalize(str: string): string {
   return str
     .toLowerCase()
@@ -71,25 +73,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     const cleanPass = teacherPassword.trim();
 
     if (!rawInput) {
-      setErrorMessage('Por favor, informe o seu e-mail institucional (@escola.pr.gov.br).');
+      setErrorMessage('Por favor, informe o seu e-mail completo de acesso.');
       return;
     }
 
-    if (!rawInput.includes('@')) {
+    if (!EMAIL_REGEX.test(rawInput)) {
       setErrorMessage(
-        'Informe o seu e-mail completo (@escola.pr.gov.br). Não é permitido entrar apenas com o nome.'
+        'Informe o seu e-mail completo (ex: seu.nome@escola.pr.gov.br ou seu Gmail). Não é permitido entrar apenas com o nome.'
       );
       return;
     }
 
     const normInput = normalize(rawInput);
-
-    if (!normInput.endsWith('@escola.pr.gov.br')) {
-      setErrorMessage(
-        'Utilize o e-mail institucional completo terminado em @escola.pr.gov.br.'
-      );
-      return;
-    }
 
     if (!cleanPass) {
       setErrorMessage('Por favor, digite a sua senha de acesso.');
@@ -136,25 +131,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     const cleanPass = diretoraPassword.trim();
 
     if (!rawInput) {
-      setErrorMessage('Por favor, informe o seu e-mail institucional (@escola.pr.gov.br).');
+      setErrorMessage('Por favor, informe o seu e-mail completo de acesso.');
       return;
     }
 
-    if (!rawInput.includes('@')) {
+    if (!EMAIL_REGEX.test(rawInput)) {
       setErrorMessage(
-        'Informe o seu e-mail completo (@escola.pr.gov.br). Não é permitido entrar apenas com o nome.'
+        'Informe o seu e-mail completo (ex: nome@escola.pr.gov.br). Não é permitido entrar apenas com o nome.'
       );
       return;
     }
 
     const normInput = normalize(rawInput);
-
-    if (!normInput.endsWith('@escola.pr.gov.br')) {
-      setErrorMessage(
-        'Utilize o e-mail institucional completo terminado em @escola.pr.gov.br.'
-      );
-      return;
-    }
 
     if (!cleanPass) {
       setErrorMessage('Por favor, digite a sua senha de acesso.');
@@ -285,7 +273,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   {/* Teacher Email Input */}
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      E-mail Institucional
+                      E-mail de Acesso (Institucional ou Gmail)
                     </label>
                     <div className="relative">
                       <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -294,14 +282,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                         required
                         autoComplete="email"
                         id="input-teacher-name"
-                        placeholder="seu.nome@escola.pr.gov.br"
+                        placeholder="seu.nome@escola.pr.gov.br ou @gmail.com"
                         value={teacherInput}
                         onChange={(e) => setTeacherInput(e.target.value)}
                         className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-medium"
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Entre utilizando o seu e-mail completo (@escola.pr.gov.br) cadastrado pela Direção.
+                      Entre utilizando o seu e-mail completo (@escola.pr.gov.br ou Gmail cadastrado).
                     </p>
                   </div>
 

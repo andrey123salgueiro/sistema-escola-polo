@@ -70,6 +70,7 @@ import { ClassPanorama } from './components/ClassPanorama';
 import { ClassPerformance } from './components/ClassPerformance';
 import { ReportViewModal } from './components/ReportViewModal';
 import { AdminProfileModal } from './components/AdminProfileModal';
+import { TeacherProfileModal } from './components/TeacherProfileModal';
 import {
   AdminTeamManagement,
   isGeneralDirector,
@@ -450,6 +451,19 @@ export default function App() {
     persistCurrentUser(updatedAdmin);
     await saveUserDoc(updatedAdmin);
     showToast('Seus dados de acesso e perfil foram atualizados e salvos na nuvem!');
+  };
+
+  // Teacher self-profile update (Gmail/email & password only)
+  const handleUpdateTeacherProfile = async (updatedTeacher: User) => {
+    setUsers((prev) => {
+      const updated = prev.map((u) => (u.id === updatedTeacher.id ? updatedTeacher : u));
+      saveStoredUsers(updated);
+      return updated;
+    });
+    setCurrentUserState(updatedTeacher);
+    persistCurrentUser(updatedTeacher);
+    await saveUserDoc(updatedTeacher);
+    showToast('Seu e-mail de acesso e senha foram atualizados com sucesso!');
   };
 
   // Administrative Team CRUD actions
@@ -961,6 +975,7 @@ export default function App() {
                   setActiveTab('new-form');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
+                onOpenProfile={() => setIsProfileModalOpen(true)}
               />
             )}
 
@@ -1042,14 +1057,22 @@ export default function App() {
         />
       )}
 
-      {/* Admin Self-Edit Profile Modal */}
-      {isDiretora && (
+      {/* Admin or Teacher Self-Edit Profile Modal */}
+      {isDiretora ? (
         <AdminProfileModal
           isOpen={isProfileModalOpen}
           onClose={() => setIsProfileModalOpen(false)}
           currentUser={currentUser}
           allUsers={users}
           onSaveProfile={handleUpdateAdminProfile}
+        />
+      ) : (
+        <TeacherProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          currentUser={currentUser}
+          allUsers={users}
+          onSaveProfile={handleUpdateTeacherProfile}
         />
       )}
     </div>
