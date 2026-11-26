@@ -15,6 +15,7 @@
         "subject": { "type": "string", "description": "Disciplina ou componente lecionado" },
         "subjects": { "type": "array", "description": "Lista de matérias ou componentes lecionados pelo professor" },
         "classes": { "type": "array", "description": "Turmas atribuídas" },
+        "classSubjects": { "type": "object", "description": "Mapa opcional de turma para matérias lecionadas nela" },
         "active": { "type": "boolean", "description": "Se usuário está ativo" }
       },
       "required": ["id", "name", "email", "role"]

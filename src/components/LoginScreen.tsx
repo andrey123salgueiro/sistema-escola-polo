@@ -9,7 +9,7 @@ import {
   LogIn,
   GraduationCap,
   ShieldCheck,
-  User as UserIcon,
+  Mail,
   CheckCircle2,
 } from 'lucide-react';
 import {
@@ -71,7 +71,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     const cleanPass = teacherPassword.trim();
 
     if (!rawInput) {
-      setErrorMessage('Por favor, informe o seu nome de professor cadastrado.');
+      setErrorMessage('Por favor, informe o seu e-mail institucional (@escola.pr.gov.br).');
+      return;
+    }
+
+    if (!rawInput.includes('@')) {
+      setErrorMessage(
+        'Informe o seu e-mail completo (@escola.pr.gov.br). Não é permitido entrar apenas com o nome.'
+      );
+      return;
+    }
+
+    const normInput = normalize(rawInput);
+
+    if (!normInput.endsWith('@escola.pr.gov.br')) {
+      setErrorMessage(
+        'Utilize o e-mail institucional completo terminado em @escola.pr.gov.br.'
+      );
       return;
     }
 
@@ -80,51 +96,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    const normInput = normalize(rawInput);
-
-    const isAdminUser = adminUsers.some((admin) => {
-      const adminUsername = normalize(admin.username || '');
-      const adminEmail = normalize(admin.email || '');
-      return (
-        (adminUsername !== '' && normInput === adminUsername) ||
-        (adminEmail !== '' && normInput === adminEmail) ||
-        normInput === 'diretoria@escola.gov.br'
-      );
-    });
+    const isAdminUser = adminUsers.some(
+      (admin) => normalize(admin.email || '') === normInput
+    );
     if (isAdminUser) {
       setErrorMessage(
-        'Este usuário pertence à Equipe Administrativa. Por favor, acesse através da aba Acesso Administrativo.'
+        'Este e-mail pertence à Equipe Administrativa. Por favor, acesse através da aba Acesso Administrativo.'
       );
       return;
     }
 
-    // Search by full name, username or email (case & accent insensitive)
-    let foundTeacher = teacherUsers.find((t) => {
-      const normName = normalize(t.name);
-      const normUsername = normalize(t.username || t.name);
-      const normEmail = normalize(t.email);
-      return (
-        normName === normInput ||
-        normUsername === normInput ||
-        normEmail === normInput
-      );
-    });
-
-    // If not found by exact match, try partial match
-    if (!foundTeacher) {
-      const candidates = teacherUsers.filter((t) => {
-        const normName = normalize(t.name);
-        return normName.includes(normInput) || normInput.includes(normName);
-      });
-
-      if (candidates.length === 1) {
-        foundTeacher = candidates[0];
-      }
-    }
+    // Search strictly by full institutional email
+    const foundTeacher = teacherUsers.find(
+      (t) => normalize(t.email || '') === normInput
+    );
 
     if (!foundTeacher) {
       setErrorMessage(
-        `Professor(a) "${rawInput}" não encontrado(a). Verifique a grafia ou consulte a Direção.`
+        `E-mail "${rawInput}" não encontrado no cadastro de professores. Verifique o endereço ou consulte a Direção.`
       );
       return;
     }
@@ -144,11 +133,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMessage(null);
 
     const rawInput = diretoraInput.trim();
-    const normInput = normalize(rawInput);
     const cleanPass = diretoraPassword.trim();
 
     if (!rawInput) {
-      setErrorMessage('Por favor, informe o seu usuário ou e-mail administrativo.');
+      setErrorMessage('Por favor, informe o seu e-mail institucional (@escola.pr.gov.br).');
+      return;
+    }
+
+    if (!rawInput.includes('@')) {
+      setErrorMessage(
+        'Informe o seu e-mail completo (@escola.pr.gov.br). Não é permitido entrar apenas com o nome.'
+      );
+      return;
+    }
+
+    const normInput = normalize(rawInput);
+
+    if (!normInput.endsWith('@escola.pr.gov.br')) {
+      setErrorMessage(
+        'Utilize o e-mail institucional completo terminado em @escola.pr.gov.br.'
+      );
       return;
     }
 
@@ -157,51 +161,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    // 1. Exact match by username, email or full name across all administrative users
-    let matchedAdmin = adminUsers.find((admin) => {
-      const normUsername = normalize(admin.username || '');
-      const normEmail = normalize(admin.email || '');
-      const normName = normalize(admin.name || '');
-      return (
-        (normUsername !== '' && normInput === normUsername) ||
-        (normEmail !== '' && normInput === normEmail) ||
-        (normName !== '' && normInput === normName)
-      );
-    });
-
-    // 2. Fallback: unique partial name match (e.g. "Ana Paula Machado" matching "Prof.ª Ana Paula Machado (Direção)")
-    if (!matchedAdmin && normInput.length >= 3) {
-      const candidates = adminUsers.filter((admin) => {
-        const normName = normalize(admin.name || '');
-        return normName.includes(normInput) || normInput.includes(normName);
-      });
-      if (candidates.length === 1) {
-        matchedAdmin = candidates[0];
-      } else if (candidates.length > 1) {
-        setErrorMessage(
-          'Mais de um membro administrativo corresponde a esse nome. Informe seu usuário de login completo.'
-        );
-        return;
-      }
-    }
+    // Search strictly by full institutional email
+    const matchedAdmin = adminUsers.find(
+      (admin) => normalize(admin.email || '') === normInput
+    );
 
     if (!matchedAdmin) {
       const isTeacher = teacherUsers.some(
-        (t) =>
-          normalize(t.name) === normInput ||
-          normalize(t.username || '') === normInput ||
-          normalize(t.email || '') === normInput
+        (t) => normalize(t.email || '') === normInput
       );
 
       if (isTeacher) {
         setErrorMessage(
-          'Este usuário pertence a um professor. Por favor, utilize a aba Acesso do Professor.'
+          'Este e-mail pertence a um professor. Por favor, utilize a aba Acesso do Professor.'
         );
         return;
       }
 
       setErrorMessage(
-        `Usuário administrativo "${rawInput}" não encontrado. Verifique seu login na aba Equipe Admin.`
+        `E-mail administrativo "${rawInput}" não encontrado. Verifique seu e-mail na aba Equipe Admin.`
       );
       return;
     }
@@ -303,26 +281,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </p>
                 </div>
 
-                <form onSubmit={handleTeacherSubmit} className="space-y-4">
-                  {/* Teacher Name Input (Username) */}
+                <form onSubmit={handleTeacherSubmit} noValidate className="space-y-4">
+                  {/* Teacher Email Input */}
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Nome do Professor (Usuário)
+                      E-mail Institucional
                     </label>
                     <div className="relative">
-                      <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
-                        type="text"
+                        type="email"
                         required
+                        autoComplete="email"
                         id="input-teacher-name"
-                        placeholder="Digite seu nome (ex: Carlos Eduardo Souza)"
+                        placeholder="seu.nome@escola.pr.gov.br"
                         value={teacherInput}
                         onChange={(e) => setTeacherInput(e.target.value)}
                         className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-medium"
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Seu usuário de acesso é o seu nome completo cadastrado pela Direção.
+                      Entre utilizando o seu e-mail completo (@escola.pr.gov.br) cadastrado pela Direção.
                     </p>
                   </div>
 
@@ -395,23 +374,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     <span>Login individual por membro da equipe:</span>
                   </div>
                   <p className="text-[11px] text-slate-600 ml-5">
-                    Informe seu <strong>usuário</strong> (ou nome/e-mail) e sua <strong>senha pessoal</strong>.
+                    Informe seu <strong>e-mail institucional completo</strong> (<span className="font-mono">@escola.pr.gov.br</span>) e sua <strong>senha pessoal</strong>.
                   </p>
                 </div>
 
-                <form onSubmit={handleDiretoraSubmit} className="space-y-4">
-                  {/* Admin Username */}
+                <form onSubmit={handleDiretoraSubmit} noValidate className="space-y-4">
+                  {/* Admin Email */}
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Usuário, Nome ou E-mail
+                      E-mail Institucional
                     </label>
                     <div className="relative">
-                      <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
-                        type="text"
+                        type="email"
                         required
+                        autoComplete="email"
                         id="input-diretora-user"
-                        placeholder="Ex: valdirene.sperandio ou admin"
+                        placeholder="seu.nome@escola.pr.gov.br"
                         value={diretoraInput}
                         onChange={(e) => setDiretoraInput(e.target.value)}
                         className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-mono font-medium"

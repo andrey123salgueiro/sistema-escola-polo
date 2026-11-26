@@ -304,7 +304,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      placeholder="seu.email@escola.gov.br ou WhatsApp"
+                      placeholder="seu.email@escola.pr.gov.br ou WhatsApp"
                       value={senderContact}
                       onChange={(e) => setSenderContact(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-900"

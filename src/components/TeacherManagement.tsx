@@ -45,6 +45,7 @@ interface ImportedTeacherPreview {
   subject: string;
   subjects: string[];
   classes: string[];
+  classSubjects?: Record<string, string[]>;
   email: string;
   password: string;
 }
@@ -65,7 +66,7 @@ function generateInstitutionEmail(name: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '.')
     .replace(/^\.+|\.+$/g, '');
-  return `${local || 'professor'}@escola.gov.br`;
+  return `${local || 'professor'}@escola.pr.gov.br`;
 }
 
 function compactClassKey(value: string): string {
@@ -169,6 +170,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
   const [selectedClasses, setSelectedClasses] = useState<string[]>([
     availableClassNames[0] || '6º Ano A',
   ]);
+  const [classSubjectsMap, setClassSubjectsMap] = useState<Record<string, string[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
@@ -189,6 +191,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     setPassword('123');
     setSelectedSubjects([availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]]);
     setSelectedClasses([availableClassNames[0] || '6º Ano A']);
+    setClassSubjectsMap({});
     setEditingTeacherId(null);
     setShowQuickSubject(false);
     setQuickSubjectName('');
@@ -215,21 +218,70 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         : [availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]]
     );
     setSelectedClasses(teacher.classes || []);
+    setClassSubjectsMap(teacher.classSubjects ? { ...teacher.classSubjects } : {});
     setEditingTeacherId(teacher.id);
     setShowForm(true);
     scrollToForm();
   };
 
   const handleToggleSubject = (sub: string) => {
-    setSelectedSubjects((prev) =>
-      prev.includes(sub) ? prev.filter((s) => s !== sub) : [...prev, sub]
-    );
+    setSelectedSubjects((prev) => {
+      const removing = prev.includes(sub);
+      if (removing) {
+        setClassSubjectsMap((mapPrev) => {
+          const next: Record<string, string[]> = {};
+          for (const [clsKey, list] of Object.entries(mapPrev) as Array<[string, string[]]>) {
+            const filtered = Array.isArray(list) ? list.filter((s) => s !== sub) : [];
+            if (filtered.length > 0) next[clsKey] = filtered;
+          }
+          return next;
+        });
+        return prev.filter((s) => s !== sub);
+      }
+      return [...prev, sub];
+    });
   };
 
   const handleToggleClass = (cls: string) => {
-    setSelectedClasses((prev) =>
-      prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls]
-    );
+    setSelectedClasses((prev) => {
+      const removing = prev.includes(cls);
+      if (removing) {
+        setClassSubjectsMap((mapPrev) => {
+          const next = { ...mapPrev };
+          delete next[cls];
+          return next;
+        });
+        return prev.filter((c) => c !== cls);
+      }
+      return [...prev, cls];
+    });
+  };
+
+  const handleToggleClassSubject = (cls: string, sub: string) => {
+    setClassSubjectsMap((prev) => {
+      const current = prev[cls] || [];
+      const exists = current.includes(sub);
+      const updated = exists ? current.filter((s) => s !== sub) : [...current, sub];
+      const next = { ...prev };
+      if (updated.length > 0) {
+        next[cls] = updated;
+      } else {
+        delete next[cls];
+      }
+      return next;
+    });
+  };
+
+  const handleSetAllSubjectsForClass = (cls: string, subs: string[]) => {
+    setClassSubjectsMap((prev) => {
+      const next = { ...prev };
+      if (subs.length > 0) {
+        next[cls] = [...subs];
+      } else {
+        delete next[cls];
+      }
+      return next;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -251,11 +303,24 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
     const cleanPass = password.trim() || '123';
     const joinedSubject = selectedSubjects.join(', ');
 
+    const cleanedClassSubjects: Record<string, string[]> = {};
+    if (selectedSubjects.length > 1) {
+      selectedClasses.forEach((cls) => {
+        const mapped = (classSubjectsMap[cls] || []).filter((sub) =>
+          selectedSubjects.includes(sub)
+        );
+        if (mapped.length > 0) {
+          cleanedClassSubjects[cls] = mapped;
+        }
+      });
+    }
+
     if (editingTeacherId) {
       const existing = teachers.find((t) => t.id === editingTeacherId);
       if (existing) {
+        const { classSubjects: _oldMap, ...restExisting } = existing;
         onUpdateTeacher({
-          ...existing,
+          ...restExisting,
           name: cleanName,
           username: cleanName,
           email: cleanEmail,
@@ -263,6 +328,9 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           subject: joinedSubject,
           subjects: selectedSubjects,
           classes: selectedClasses,
+          ...(Object.keys(cleanedClassSubjects).length > 0
+            ? { classSubjects: cleanedClassSubjects }
+            : {}),
         });
         setFeedbackMsg(`Dados do professor(a) "${cleanName}" atualizados com sucesso!`);
       }
@@ -277,11 +345,14 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         subject: joinedSubject,
         subjects: selectedSubjects,
         classes: selectedClasses,
+        ...(Object.keys(cleanedClassSubjects).length > 0
+          ? { classSubjects: cleanedClassSubjects }
+          : {}),
         createdAt: new Date().toISOString().split('T')[0],
       };
       onAddTeacher(newTeacher);
       setFeedbackMsg(
-        `Professor(a) "${cleanName}" cadastrado com sucesso! Usuário: "${cleanName}" | Senha: "${cleanPass}".`
+        `Professor(a) "${cleanName}" cadastrado com sucesso! E-mail de acesso: "${cleanEmail}" | Senha: "${cleanPass}".`
       );
     }
 
@@ -385,6 +456,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
             name: string;
             subjects: string[];
             classes: string[];
+            classSubjects: Record<string, string[]>;
             email: string;
             password: string;
           }
@@ -427,6 +499,12 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           if (existingEntry) {
             parsedClasses.forEach((c) => {
               if (!existingEntry.classes.includes(c)) existingEntry.classes.push(c);
+              if (parsedSubjects.length > 0) {
+                const prevSubs = existingEntry.classSubjects[c] || [];
+                existingEntry.classSubjects[c] = Array.from(
+                  new Set([...prevSubs, ...parsedSubjects])
+                );
+              }
             });
             parsedSubjects.forEach((s) => {
               if (!existingEntry.subjects.includes(s)) existingEntry.subjects.push(s);
@@ -434,10 +512,17 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
             if (!existingEntry.email && rawEmail) existingEntry.email = rawEmail;
             if (!existingEntry.password && rawPassword) existingEntry.password = rawPassword;
           } else {
+            const initialClassSubjects: Record<string, string[]> = {};
+            if (parsedSubjects.length > 0) {
+              parsedClasses.forEach((c) => {
+                initialClassSubjects[c] = Array.from(new Set(parsedSubjects));
+              });
+            }
             grouped.set(normName, {
               name: rawName,
               subjects: Array.from(new Set(parsedSubjects)),
               classes: parsedClasses,
+              classSubjects: initialClassSubjects,
               email: rawEmail,
               password: rawPassword,
             });
@@ -472,12 +557,25 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                 ? existingSubjects
                 : [availableSubjectNames[0] || AVAILABLE_SUBJECTS[0]];
 
+            const mergedClassSubjects: Record<string, string[]> = {
+              ...(existingTeacher?.classSubjects || {}),
+            };
+            Object.entries(entry.classSubjects).forEach(([cls, subs]) => {
+              mergedClassSubjects[cls] = Array.from(
+                new Set([...(mergedClassSubjects[cls] || []), ...subs])
+              );
+            });
+
             return {
               existingId: existingTeacher?.id,
               name: existingTeacher?.name || entry.name,
               subject: mergedSubjects.join(', '),
               subjects: mergedSubjects,
               classes: mergedClasses,
+              ...(mergedSubjects.length > 1 &&
+              Object.keys(mergedClassSubjects).length > 0
+                ? { classSubjects: mergedClassSubjects }
+                : {}),
               email:
                 entry.email ||
                 existingTeacher?.email ||
@@ -518,6 +616,9 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
           subject: item.subject,
           subjects: item.subjects,
           classes: item.classes,
+          ...(item.classSubjects && Object.keys(item.classSubjects).length > 0
+            ? { classSubjects: item.classSubjects }
+            : {}),
         };
       }
       return {
@@ -530,6 +631,9 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         subject: item.subject,
         subjects: item.subjects,
         classes: item.classes,
+        ...(item.classSubjects && Object.keys(item.classSubjects).length > 0
+          ? { classSubjects: item.classSubjects }
+          : {}),
         createdAt: todayStr,
       };
     });
@@ -569,7 +673,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
         'Nome do Professor': 'Carlos Eduardo Souza',
         'Matéria': 'Matemática, Física',
         'Turmas': '6º Ano A, 7º Ano B, 1º Ano EM',
-        'E-mail': 'carlos.souza@escola.gov.br',
+        'E-mail': 'carlos.souza@escola.pr.gov.br',
         'Senha': '123',
       },
       {
@@ -763,7 +867,7 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
               {/* Nome */}
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Nome do(a) Professor(a) (Usuário de Acesso) *
+                  Nome Completo do(a) Professor(a) *
                 </label>
                 <input
                   type="text"
@@ -774,22 +878,25 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                   className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 font-medium"
                 />
                 <p className="text-[11px] text-stone-500 mt-0.5">
-                  O professor utilizará este nome para entrar no sistema.
+                  Nome exibido nas fichas e relatórios pedagógicos.
                 </p>
               </div>
 
               {/* Email / Login */}
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  E-mail Institucional (Opcional)
+                  E-mail Institucional (@escola.pr.gov.br)
                 </label>
                 <input
                   type="email"
-                  placeholder="Deixe vazio para gerar automaticamente"
+                  placeholder="nome.sobrenome@escola.pr.gov.br"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-xs text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  E-mail usado pelo professor para entrar. Se vazio, gera @escola.pr.gov.br.
+                </p>
               </div>
 
               {/* Senha */}
@@ -919,6 +1026,89 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                 })}
               </div>
             </div>
+
+            {/* Matérias por Turma (quando leciona mais de 1 matéria) */}
+            {selectedSubjects.length > 1 && selectedClasses.length > 0 && (
+              <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-stone-800">
+                    Matérias por Turma (Filtro nas Fichas do Professor)
+                  </label>
+                  <p className="text-[11px] text-stone-600 mt-0.5">
+                    Marque quais matérias este professor leciona em cada turma. Assim, ao preencher a ficha da turma, aparecerão <strong>somente</strong> as matérias marcadas para ela. Turmas sem marcação continuam exibindo todas as matérias do professor.
+                  </p>
+                </div>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {selectedClasses.map((cls) => {
+                    const mappedForCls = (classSubjectsMap[cls] || []).filter((s) =>
+                      selectedSubjects.includes(s)
+                    );
+                    return (
+                      <div
+                        key={cls}
+                        className="bg-white border border-stone-200 rounded-xl p-3 flex flex-col gap-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-950 font-bold text-xs border border-amber-200">
+                              {cls}
+                            </span>
+                            <span className="text-[11px] text-stone-500">
+                              {mappedForCls.length === 0
+                                ? 'Todas as matérias liberadas'
+                                : mappedForCls.length === 1
+                                ? '1 matéria selecionada (pré-selecionada na ficha)'
+                                : `${mappedForCls.length} matérias selecionadas`}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => handleSetAllSubjectsForClass(cls, selectedSubjects)}
+                              className="text-amber-800 hover:underline font-semibold cursor-pointer"
+                            >
+                              Todas
+                            </button>
+                            {mappedForCls.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetAllSubjectsForClass(cls, [])}
+                                className="text-stone-500 hover:text-stone-800 hover:underline cursor-pointer"
+                              >
+                                Limpar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedSubjects.map((sub) => {
+                            const active = mappedForCls.includes(sub);
+                            return (
+                              <button
+                                key={sub}
+                                type="button"
+                                onClick={() => handleToggleClassSubject(cls, sub)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer ${
+                                  active
+                                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                                    : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-100'
+                                }`}
+                              >
+                                {active ? '✓ ' : ''}
+                                {sub}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Submit & Cancel */}
             <div className="pt-3 flex items-center justify-end gap-3 border-t border-stone-100">
@@ -1205,16 +1395,30 @@ export const TeacherManagement: React.FC<TeacherManagementProps> = ({
                   <div className="flex flex-wrap items-center gap-1.5 mt-2">
                     <Layers className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                     {teacher.classes && teacher.classes.length > 0 ? (
-                      teacher.classes.map((cls) => (
-                        <span
-                          key={cls}
-                          className="px-2 py-0.5 bg-stone-100 text-stone-700 rounded-md text-[10px] font-semibold"
-                        >
-                          {cls}
-                        </span>
-                      ))
+                      teacher.classes.map((cls) => {
+                        const mappedSubs = teacher.classSubjects?.[cls];
+                        return (
+                          <span
+                            key={cls}
+                            className="px-2 py-0.5 bg-stone-100 text-stone-700 rounded-md text-[10px] font-semibold"
+                            title={
+                              mappedSubs && mappedSubs.length > 0
+                                ? `${cls}: ${mappedSubs.join(', ')}`
+                                : cls
+                            }
+                          >
+                            {cls}
+                            {mappedSubs && mappedSubs.length > 0 ? ` (${mappedSubs.length})` : ''}
+                          </span>
+                        );
+                      })
                     ) : (
                       <span className="text-[10px] text-stone-400">Nenhuma turma atribuída</span>
+                    )}
+                    {teacher.classSubjects && Object.keys(teacher.classSubjects).length > 0 && (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-md text-[10px] font-semibold">
+                        Filtro por turma ativo ({Object.keys(teacher.classSubjects).length})
+                      </span>
                     )}
                   </div>
                 </div>

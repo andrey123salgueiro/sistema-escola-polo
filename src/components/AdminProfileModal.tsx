@@ -250,7 +250,7 @@ export const AdminProfileModal: React.FC<AdminProfileModalProps> = ({
                   id="input-admin-profile-email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="diretoria@escola.gov.br"
+                  placeholder="diretoria@escola.pr.gov.br"
                   className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>

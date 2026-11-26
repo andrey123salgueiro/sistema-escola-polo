@@ -70,6 +70,61 @@ export function getTeacherClasses(user?: Pick<User, 'classes'> | null): string[]
   return unique;
 }
 
+function getMappedSubjectsEntry(
+  user?: Pick<User, 'classSubjects'> | null,
+  classGroup?: string | null
+): string[] | null {
+  if (!user?.classSubjects || !classGroup) return null;
+
+  const exact = user.classSubjects[classGroup];
+  if (Array.isArray(exact) && exact.length > 0) {
+    return exact;
+  }
+
+  const targetKey = normalizeTeacherText(classGroup);
+  for (const [key, list] of Object.entries(user.classSubjects)) {
+    if (normalizeTeacherText(key) === targetKey && Array.isArray(list) && list.length > 0) {
+      return list;
+    }
+  }
+
+  return null;
+}
+
+export function hasClassSubjectMappingForClass(
+  user?: Pick<User, 'classSubjects'> | null,
+  classGroup?: string | null
+): boolean {
+  return getMappedSubjectsEntry(user, classGroup) !== null;
+}
+
+export function getTeacherSubjectsForClass(
+  user?: Pick<User, 'subject' | 'subjects' | 'classSubjects'> | null,
+  classGroup?: string | null
+): string[] {
+  const allSubjects = getTeacherSubjects(user);
+  const mapped = getMappedSubjectsEntry(user, classGroup);
+
+  if (!mapped) {
+    return allSubjects;
+  }
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const item of mapped) {
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      const key = normalizeTeacherText(trimmed);
+      if (trimmed && !PLACEHOLDER_SUBJECTS.has(key) && !seen.has(key)) {
+        seen.add(key);
+        unique.push(trimmed);
+      }
+    }
+  }
+
+  return unique.length > 0 ? unique : allSubjects;
+}
+
 export function isUnassignedReportComponent(
   component?: string | null,
   knownSubjects: string[] = []

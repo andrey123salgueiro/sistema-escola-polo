@@ -20,6 +20,7 @@ import {
 import {
   getTeacherClasses,
   getTeacherSubjects,
+  getTeacherSubjectsForClass,
   isUnassignedReportComponent,
 } from '../utils/teacherUtils';
 import {
@@ -73,29 +74,37 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const teacherSubjects = getTeacherSubjects(currentUser);
   const teacherClasses = getTeacherClasses(currentUser);
 
-  const resolveInitialComponent = (reportComp?: string): string => {
+  const initialClassGroup =
+    activeReport?.classGroup ||
+    teacherClasses[0] ||
+    (classes.length > 0 ? classes[0].name : AVAILABLE_CLASSES[0]);
+
+  const resolveInitialComponent = (
+    reportComp?: string,
+    targetClassGroup: string = initialClassGroup
+  ): string => {
     if (
       reportComp &&
       !isUnassignedReportComponent(reportComp, allSchoolSubjectNames)
     ) {
       return reportComp;
     }
+    const scopedSubjects =
+      currentUser.role === 'professor'
+        ? getTeacherSubjectsForClass(currentUser, targetClassGroup)
+        : teacherSubjects;
     if (currentUser.role === 'professor') {
-      if (teacherSubjects.length === 1) return teacherSubjects[0];
-      if (teacherSubjects.length > 1) return '';
+      if (scopedSubjects.length === 1) return scopedSubjects[0];
+      if (scopedSubjects.length > 1) return '';
     }
-    return teacherSubjects[0] || allSchoolSubjectNames[0] || 'Matemática';
+    return scopedSubjects[0] || allSchoolSubjectNames[0] || 'Matemática';
   };
 
   // Form fields
   const [component, setComponent] = useState<string>(() =>
-    resolveInitialComponent(activeReport?.component)
+    resolveInitialComponent(activeReport?.component, initialClassGroup)
   );
-  const [classGroup, setClassGroup] = useState(
-    activeReport?.classGroup ||
-      teacherClasses[0] ||
-      (classes.length > 0 ? classes[0].name : AVAILABLE_CLASSES[0])
-  );
+  const [classGroup, setClassGroup] = useState(initialClassGroup);
   const [date, setDate] = useState(
     activeReport?.date || new Date().toISOString().split('T')[0]
   );
@@ -117,7 +126,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
   useEffect(() => {
     if (activeReport) {
-      setComponent(resolveInitialComponent(activeReport.component));
+      setComponent(
+        resolveInitialComponent(activeReport.component, activeReport.classGroup)
+      );
       setClassGroup(activeReport.classGroup);
       setDate(activeReport.date || new Date().toISOString().split('T')[0]);
       setBimester(activeReport.bimester);
@@ -126,6 +137,11 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       setStudentRatings(activeReport.studentRatings || {});
     }
   }, [activeReport]);
+
+  const classSpecificSubjects =
+    currentUser.role === 'professor'
+      ? getTeacherSubjectsForClass(currentUser, classGroup)
+      : teacherSubjects;
 
   // Students of current classGroup
   const currentClassStudents = students.filter((s) => s.classGroup === classGroup);
@@ -431,13 +447,13 @@ export const ReportForm: React.FC<ReportFormProps> = ({
                     : 'border-stone-300'
                 }`}
               >
-                {(teacherSubjects.length > 1 || !component) && (
+                {(classSpecificSubjects.length > 1 || !component) && (
                   <option value="">-- Selecione a matéria da turma --</option>
                 )}
                 {Array.from(
                   new Set([
-                    ...(currentUser.role === 'professor' && teacherSubjects.length > 0
-                      ? teacherSubjects
+                    ...(currentUser.role === 'professor' && classSpecificSubjects.length > 0
+                      ? classSpecificSubjects
                       : allSchoolSubjectNames),
                     ...(component &&
                     !isUnassignedReportComponent(component, allSchoolSubjectNames)

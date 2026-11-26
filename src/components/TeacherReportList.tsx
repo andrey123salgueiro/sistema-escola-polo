@@ -9,6 +9,7 @@ import {
 import {
   getTeacherClasses,
   getTeacherSubjects,
+  getTeacherSubjectsForClass,
   isUnassignedReportComponent,
   normalizeTeacherText,
 } from '../utils/teacherUtils';
@@ -62,9 +63,6 @@ export const TeacherReportList: React.FC<TeacherReportListProps> = ({
   const teacherSubjects = getTeacherSubjects(currentUser);
   const allSchoolSubjectNames =
     subjects.length > 0 ? subjects.map((s) => s.name) : AVAILABLE_SUBJECTS;
-
-  const subjectChoices =
-    teacherSubjects.length > 0 ? teacherSubjects : allSchoolSubjectNames;
 
   // Filter reports only for this teacher (and for pending/draft, keep aligned with teacher's assigned classes when defined)
   const teacherReports = reports.filter((r) => {
@@ -122,15 +120,17 @@ export const TeacherReportList: React.FC<TeacherReportListProps> = ({
     if (!isUnassignedReportComponent(report.component, allSchoolSubjectNames)) {
       return report.component;
     }
-    if (teacherSubjects.length === 1) {
-      return teacherSubjects[0];
+    const classSubjects = getTeacherSubjectsForClass(currentUser, report.classGroup);
+    if (classSubjects.length === 1) {
+      return classSubjects[0];
     }
     return '';
   };
 
   const handleOpenPendingReport = (report: PreCouncilReport) => {
     const chosenSubject = getInitialCardSubject(report);
-    const hasMultipleSubjects = teacherSubjects.length > 1;
+    const classSubjects = getTeacherSubjectsForClass(currentUser, report.classGroup);
+    const hasMultipleSubjects = classSubjects.length > 1;
     const isUnassigned = isUnassignedReportComponent(
       chosenSubject,
       allSchoolSubjectNames
@@ -303,14 +303,21 @@ export const TeacherReportList: React.FC<TeacherReportListProps> = ({
             {pendingReports.map((report) => {
               const isDraft = report.status === 'rascunho';
               const cardSubject = getInitialCardSubject(report);
+              const classSubjects = getTeacherSubjectsForClass(
+                currentUser,
+                report.classGroup
+              );
+              const subjectChoicesForClass =
+                classSubjects.length > 0 ? classSubjects : allSchoolSubjectNames;
               const needsSubjectPicker =
-                teacherSubjects.length > 1 ||
-                isUnassignedReportComponent(report.component, allSchoolSubjectNames);
+                classSubjects.length > 1 ||
+                (isUnassignedReportComponent(report.component, allSchoolSubjectNames) &&
+                  classSubjects.length !== 1);
               const hasSubjectError = subjectErrorReportId === report.id;
 
               const dropdownOptions = Array.from(
                 new Set([
-                  ...subjectChoices,
+                  ...subjectChoicesForClass,
                   ...(!isUnassignedReportComponent(
                     report.component,
                     allSchoolSubjectNames
@@ -451,7 +458,11 @@ export const TeacherReportList: React.FC<TeacherReportListProps> = ({
               const hasVisto =
                 report.diretoraSignature?.signed || report.pedagogaSignature?.signed;
 
-              // Find other subjects this teacher teaches that don't yet have a report for this same class & bimester
+              // Find other subjects this teacher teaches in THIS class that don't yet have a report for this same class & bimester
+              const classSubjects = getTeacherSubjectsForClass(
+                currentUser,
+                report.classGroup
+              );
               const existingSubjectsForClassBimester = new Set(
                 teacherReports
                   .filter(
@@ -461,7 +472,7 @@ export const TeacherReportList: React.FC<TeacherReportListProps> = ({
                   )
                   .map((r) => normalizeTeacherText(r.component))
               );
-              const remainingSubjects = teacherSubjects.filter(
+              const remainingSubjects = classSubjects.filter(
                 (sub) =>
                   !existingSubjectsForClassBimester.has(normalizeTeacherText(sub))
               );

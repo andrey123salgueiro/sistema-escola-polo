@@ -185,7 +185,7 @@ export const INITIAL_ADMIN_TEAM: User[] = [
   {
     id: 'user-diretora',
     name: 'Ana Paula Machado',
-    email: 'anapaula.direcao@escola.gov.br',
+    email: 'anapaula.direcao@escola.pr.gov.br',
     username: 'admin',
     password: '123',
     role: 'diretora',
@@ -195,7 +195,7 @@ export const INITIAL_ADMIN_TEAM: User[] = [
   {
     id: 'admin-valdirene',
     name: 'Valdirene de Moraes Sperandio',
-    email: 'valdirene.direcao@escola.gov.br',
+    email: 'valdirene.direcao@escola.pr.gov.br',
     username: 'valdirene.sperandio',
     password: '123',
     role: 'diretora',
@@ -205,7 +205,7 @@ export const INITIAL_ADMIN_TEAM: User[] = [
   {
     id: 'admin-carlos',
     name: 'Carlos César Trislchtz',
-    email: 'carlos.secretaria@escola.gov.br',
+    email: 'carlos.secretaria@escola.pr.gov.br',
     username: 'carlos.cesar',
     password: '123',
     role: 'diretora',
@@ -215,7 +215,7 @@ export const INITIAL_ADMIN_TEAM: User[] = [
   {
     id: 'admin-sergio',
     name: 'Sérgio Rodrigo dos Santos',
-    email: 'sergio.coordenacao@escola.gov.br',
+    email: 'sergio.coordenacao@escola.pr.gov.br',
     username: 'sergio.santos',
     password: '123',
     role: 'diretora',
@@ -225,7 +225,7 @@ export const INITIAL_ADMIN_TEAM: User[] = [
   {
     id: 'admin-lucas',
     name: 'Lucas Matheus Rodrigues dos Santos',
-    email: 'lucas.pedagogia@escola.gov.br',
+    email: 'lucas.pedagogia@escola.pr.gov.br',
     username: 'lucas.matheus',
     password: '123',
     role: 'diretora',
@@ -235,7 +235,7 @@ export const INITIAL_ADMIN_TEAM: User[] = [
   {
     id: 'admin-maria-luiza',
     name: 'Maria Luiza Marchi Gouvea',
-    email: 'marialuiza.pedagogia@escola.gov.br',
+    email: 'marialuiza.pedagogia@escola.pr.gov.br',
     username: 'maria.luiza',
     password: '123',
     role: 'diretora',
@@ -245,7 +245,7 @@ export const INITIAL_ADMIN_TEAM: User[] = [
   {
     id: 'admin-cleidi',
     name: 'Cleidi Aparecida Deo',
-    email: 'cleidi.pedagogia@escola.gov.br',
+    email: 'cleidi.pedagogia@escola.pr.gov.br',
     username: 'cleidi.deo',
     password: '123',
     role: 'diretora',
@@ -259,7 +259,7 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'prof-carlos',
     name: 'Carlos Eduardo Souza',
-    email: 'carlos.matematica@escola.gov.br',
+    email: 'carlos.matematica@escola.pr.gov.br',
     username: 'Carlos Eduardo Souza',
     password: '123',
     role: 'professor',
@@ -270,7 +270,7 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'prof-ana',
     name: 'Ana Paula Oliveira',
-    email: 'ana.portugues@escola.gov.br',
+    email: 'ana.portugues@escola.pr.gov.br',
     username: 'Ana Paula Oliveira',
     password: '123',
     role: 'professor',
@@ -281,7 +281,7 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'prof-roberto',
     name: 'Roberto Silva Lima',
-    email: 'roberto.ciencias@escola.gov.br',
+    email: 'roberto.ciencias@escola.pr.gov.br',
     username: 'Roberto Silva Lima',
     password: '123',
     role: 'professor',

@@ -50,6 +50,7 @@ import {
   saveStudentDoc,
   batchSaveStudents,
   deleteStudentDoc,
+  normalizeSchoolEmailDomain,
 } from './firebase';
 import { DEFAULT_SCHOOL_LOGO_URL } from './data/initialData';
 import { Header } from './components/Header';
@@ -136,6 +137,7 @@ export default function App() {
     // 1. Instant hydration from local storage cache
     const loadedUsers = getStoredUsers().map((u) => ({
       ...u,
+      email: normalizeSchoolEmailDomain(u.email),
       username: u.username || u.name,
       password: u.password || '123',
     }));
@@ -145,7 +147,10 @@ export default function App() {
     const loadedClasses = getStoredClasses();
     const loadedSubjects = getStoredSubjects();
     const loadedStudents = getStoredStudents();
-    const activeUser = getCurrentUser();
+    const rawActiveUser = getCurrentUser();
+    const activeUser = rawActiveUser
+      ? { ...rawActiveUser, email: normalizeSchoolEmailDomain(rawActiveUser.email) }
+      : null;
 
     setUsers(loadedUsers);
     setQuestions(loadedQuestions);

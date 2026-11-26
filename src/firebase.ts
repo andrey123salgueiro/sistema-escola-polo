@@ -114,6 +114,7 @@ testConnection().catch(() => {});
 export type SeedCollectionKey =
   | 'users'
   | 'admin_team_v1'
+  | 'email_domain_pr_v1'
   | 'sections'
   | 'questions'
   | 'reports'
@@ -167,6 +168,7 @@ export async function markAllCollectionsSeeded(): Promise<void> {
   const allFlags: Record<SeedCollectionKey, boolean> = {
     users: true,
     admin_team_v1: true,
+    email_domain_pr_v1: true,
     sections: true,
     questions: true,
     reports: true,
@@ -249,6 +251,12 @@ async function handleEmptyCollectionSnapshot<T extends { id: string }>(
 
 // 5. Real-time Subscriptions with One-Time Auto-Seeding
 
+export function normalizeSchoolEmailDomain(email?: string): string {
+  const trimmed = (email || '').trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/@escola\.gov\.br$/i, '@escola.pr.gov.br');
+}
+
 function normalizeSeedKey(value: string): string {
   return value
     .toLowerCase()
@@ -323,6 +331,52 @@ async function ensureInitialAdminTeamSeeded(existingUsers: User[]): Promise<void
   }
 }
 
+async function ensureSchoolPrEmailDomain(existingUsers: User[]): Promise<void> {
+  const localState = readLocalSeedState();
+  if (seededMemory.email_domain_pr_v1 || localState.email_domain_pr_v1 === true) {
+    seededMemory.email_domain_pr_v1 = true;
+    return;
+  }
+
+  if (inFlightSeeding.email_domain_pr_v1) {
+    return;
+  }
+
+  inFlightSeeding.email_domain_pr_v1 = true;
+  try {
+    const alreadyMigrated = await isCollectionAlreadySeeded('email_domain_pr_v1');
+    if (alreadyMigrated) {
+      return;
+    }
+
+    const usersToMigrate = existingUsers.filter(
+      (u) => typeof u.email === 'string' && /@escola\.gov\.br$/i.test(u.email.trim())
+    );
+
+    if (usersToMigrate.length > 0) {
+      const CHUNK_SIZE = 450;
+      for (let i = 0; i < usersToMigrate.length; i += CHUNK_SIZE) {
+        const chunk = usersToMigrate.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach((u) => {
+          batch.set(
+            doc(db, 'users', u.id),
+            { email: normalizeSchoolEmailDomain(u.email) },
+            { merge: true }
+          );
+        });
+        await batch.commit();
+      }
+    }
+
+    await markCollectionSeeded('email_domain_pr_v1');
+  } catch (error) {
+    console.warn('Could not migrate user emails to @escola.pr.gov.br:', error);
+  } finally {
+    inFlightSeeding.email_domain_pr_v1 = false;
+  }
+}
+
 export function subscribeUsers(callback: (users: User[]) => void): Unsubscribe {
   const path = 'users';
   return onSnapshot(
@@ -332,8 +386,13 @@ export function subscribeUsers(callback: (users: User[]) => void): Unsubscribe {
         void handleEmptyCollectionSnapshot('users', path, INITIAL_USERS, callback);
       } else {
         void markCollectionSeeded('users');
-        const users = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as User));
-        void ensureInitialAdminTeamSeeded(users);
+        const rawUsers = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as User));
+        void ensureInitialAdminTeamSeeded(rawUsers);
+        void ensureSchoolPrEmailDomain(rawUsers);
+        const users = rawUsers.map((u) => ({
+          ...u,
+          email: normalizeSchoolEmailDomain(u.email),
+        }));
         callback(users);
       }
     },

@@ -12,6 +12,7 @@ export interface User {
   subject?: string; // Componente curricular principal ou lista separada por vírgula
   subjects?: string[]; // Múltiplos componentes curriculares lecionados
   classes?: string[]; // Turmas atribuídas
+  classSubjects?: Record<string, string[]>; // Matérias lecionadas em cada turma específica
   createdAt: string;
 }
 

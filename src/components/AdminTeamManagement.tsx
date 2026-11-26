@@ -60,7 +60,7 @@ function suggestUsername(fullName: string): string {
 
 function suggestEmail(fullName: string): string {
   const slug = suggestUsername(fullName);
-  return `${slug || 'equipe'}@escola.gov.br`;
+  return `${slug || 'equipe'}@escola.pr.gov.br`;
 }
 
 export function isGeneralDirector(user?: User | null): boolean {
@@ -243,7 +243,7 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
       };
       await onAddAdminUser(newAdmin);
       setFeedbackMsg(
-        `Acesso criado para ${cleanName} (${cleanPosition}) — Usuário: ${cleanUsername}`
+        `Acesso criado para ${cleanName} (${cleanPosition}) — E-mail: ${cleanEmail}`
       );
     }
 
@@ -321,7 +321,7 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
             </p>
             <p className="text-[11px] text-amber-900/85">
               {isMainDirector
-                ? 'Cada integrante entra na aba "Acesso Administrativo" com seu próprio usuário e senha. Apenas a Direção Geral pode editar senhas de outros membros ou remover acessos.'
+                ? 'Cada integrante entra na aba "Acesso Administrativo" usando seu e-mail completo (@escola.pr.gov.br) e sua senha individual. Apenas a Direção Geral pode editar senhas de outros membros ou remover acessos.'
                 : 'Somente a Direção Geral (Ana Paula) possui permissão para visualizar ou alterar senhas de outros integrantes e excluir acessos.'}
             </p>
           </div>
@@ -433,14 +433,14 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  E-mail Institucional
+                  E-mail Institucional (@escola.pr.gov.br)
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
                     id="input-admin-email"
-                    placeholder="nome@escola.gov.br"
+                    placeholder="nome.sobrenome@escola.pr.gov.br"
                     value={email}
                     onChange={(e) => {
                       setEmailEdited(true);
@@ -539,7 +539,7 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                 <th className="py-3.5 px-5">Integrante</th>
                 <th className="py-3.5 px-4">Cargo / Função</th>
-                <th className="py-3.5 px-4">Usuário de Login</th>
+                <th className="py-3.5 px-4">E-mail de Login</th>
                 <th className="py-3.5 px-4">Senha</th>
                 <th className="py-3.5 px-4 text-right">Ações</th>
               </tr>
@@ -598,7 +598,7 @@ export const AdminTeamManagement: React.FC<AdminTeamManagementProps> = ({
 
                     <td className="py-3.5 px-4">
                       <code className="px-2 py-1 rounded-md bg-slate-100 text-slate-900 font-mono text-[11px] font-semibold border border-slate-200">
-                        {member.username || 'admin'}
+                        {member.email}
                       </code>
                     </td>
 
